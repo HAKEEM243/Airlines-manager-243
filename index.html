@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hakvision Aircraft — Airline Management Tycoon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/panels.css">
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash-screen">
+  <div class="splash-bg-anim"></div>
+  <div class="splash-content">
+    <div class="splash-logo-wrap">
+      <svg class="splash-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="lg1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#00d4ff"/>
+            <stop offset="100%" style="stop-color:#0066cc"/>
+          </linearGradient>
+        </defs>
+        <polygon points="60,8 110,35 110,85 60,112 10,85 10,35" fill="none" stroke="url(#lg1)" stroke-width="2.5"/>
+        <polygon points="60,18 100,40 100,80 60,102 20,80 20,40" fill="none" stroke="rgba(0,212,255,0.3)" stroke-width="1"/>
+        <text x="60" y="52" text-anchor="middle" fill="url(#lg1)" font-family="Orbitron" font-size="16" font-weight="900">HAK</text>
+        <text x="60" y="70" text-anchor="middle" fill="#ffffff" font-family="Orbitron" font-size="11" font-weight="600">VISION</text>
+        <path d="M35 82 L60 72 L85 82" fill="none" stroke="#00d4ff" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <h1 class="splash-title">HAKVISION <span>AIRCRAFT</span></h1>
+    <p class="splash-sub">Airline Management Tycoon • Premium Edition</p>
+    <div class="splash-menu" id="splash-menu">
+      <div id="save-notice" class="save-notice hidden">
+        <span class="save-ico">💾</span>
+        <span id="save-notice-text">Partie sauvegardée trouvée</span>
+      </div>
+      <button class="btn-splash primary" id="btn-new-game">✈ &nbsp;Nouvelle Partie</button>
+      <button class="btn-splash secondary hidden" id="btn-continue">▶ &nbsp;Continuer</button>
+    </div>
+    <div class="splash-ver">v1.0.0 — Build 2024</div>
+  </div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" class="fullscreen-overlay hidden">
+  <div class="setup-card">
+    <div class="setup-hdr">
+      <div class="hv-badge">HV</div>
+      <h2>Créer votre Compagnie Aérienne</h2>
+      <p>Capital initial : <strong>$50,000,000</strong></p>
+    </div>
+    <div class="setup-body">
+      <div class="fg">
+        <label>Nom de la Compagnie <span class="req">*</span></label>
+        <input type="text" id="inp-cname" placeholder="ex: HakAir International" maxlength="40" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label>Code IATA (2 lettres) <span class="req">*</span></label>
+        <input type="text" id="inp-iata" placeholder="HA" maxlength="2" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label>Hub Principal <span class="req">*</span></label>
+        <div class="search-wrap">
+          <input type="text" id="inp-hub" placeholder="Rechercher une ville ou un aéroport…" autocomplete="off">
+          <div id="hub-list" class="dropdown-list hidden"></div>
+        </div>
+        <input type="hidden" id="inp-hub-iata">
+      </div>
+      <div id="hub-card" class="hub-preview hidden">
+        <div class="hub-card-inner">
+          <div>
+            <div class="hc-city" id="hc-city">-</div>
+            <div class="hc-country" id="hc-country">-</div>
+          </div>
+          <div class="hc-stats">
+            <div><span class="hcs-lbl">Passagers/j</span><strong id="hc-pax">-</strong></div>
+            <div><span class="hcs-lbl">Cargo t/j</span><strong id="hc-cargo">-</strong></div>
+            <div><span class="hcs-lbl">Attractivité</span><strong id="hc-attr">-</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="setup-tip">💡 Votre hub détermine votre positionnement géographique initial et les droits de trafic disponibles.</div>
+      <button class="btn-primary w100 mt2" id="btn-launch" disabled>Décoller ✈</button>
+      <button class="btn-ghost w100" id="btn-back-splash">← Retour</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GAME -->
+<div id="game" class="hidden">
+
+  <!-- Map Layer -->
+  <div id="map"></div>
+
+  <!-- Night overlay for day/night cycle -->
+  <canvas id="night-canvas"></canvas>
+
+  <!-- UI Overlay -->
+  <div id="ui">
+
+    <!-- HEADER -->
+    <header id="hdr">
+      <div class="hdr-brand">
+        <div class="hv-badge-sm">HV</div>
+        <div class="hdr-company">
+          <span id="hdr-cname">HakAir</span>
+          <span id="hdr-iata" class="hdr-iata-tag">HA</span>
+        </div>
+      </div>
+      <div class="hdr-stats">
+        <div class="hstat" title="Capital disponible">
+          <span class="hstat-ico">💰</span>
+          <div>
+            <div class="hstat-lbl">Capital</div>
+            <div class="hstat-val" id="h-cash">$50,000,000</div>
+          </div>
+        </div>
+        <div class="hstat" title="Réputation">
+          <span class="hstat-ico">⭐</span>
+          <div>
+            <div class="hstat-lbl">Réputation</div>
+            <div class="hstat-val" id="h-rep">0/100</div>
+          </div>
+        </div>
+        <div class="hstat" title="Appareils en flotte">
+          <span class="hstat-ico">✈</span>
+          <div>
+            <div class="hstat-lbl">Flotte</div>
+            <div class="hstat-val" id="h-fleet">0</div>
+          </div>
+        </div>
+        <div class="hstat" title="Routes actives">
+          <span class="hstat-ico">🛣</span>
+          <div>
+            <div class="hstat-lbl">Routes</div>
+            <div class="hstat-val" id="h-routes">0</div>
+          </div>
+        </div>
+        <div class="hstat" title="Date du jeu">
+          <span class="hstat-ico">📅</span>
+          <div>
+            <div class="hstat-lbl">Date</div>
+            <div class="hstat-val" id="h-date">Janv 2024</div>
+          </div>
+        </div>
+      </div>
+      <div class="hdr-ctrl">
+        <div class="speed-bar">
+          <button class="spd" data-speed="0" title="Pause">⏸</button>
+          <button class="spd active" data-speed="1">1×</button>
+          <button class="spd" data-speed="2">2×</button>
+          <button class="spd" data-speed="5">5×</button>
+          <button class="spd" data-speed="10">10×</button>
+        </div>
+        <button class="icon-btn" id="btn-save" title="Sauvegarder">💾</button>
+      </div>
+    </header>
+
+    <!-- LEFT NAV -->
+    <nav id="sidenav">
+      <button class="nav-btn" data-tab="fleet" title="Gestion de Flotte">
+        <span>✈</span><small>Flotte</small>
+      </button>
+      <button class="nav-btn" data-tab="routes" title="Planification des Routes">
+        <span>🗺</span><small>Routes</small>
+      </button>
+      <button class="nav-btn" data-tab="company" title="Compagnie & Finances">
+        <span>🏢</span><small>Compagnie</small>
+      </button>
+      <button class="nav-btn" data-tab="dashboard" title="Dashboard KPI">
+        <span>📊</span><small>Stats</small>
+      </button>
+      <button class="nav-btn" data-tab="admin" title="Admin & Sandbox">
+        <span>⚡</span><small>Admin</small>
+      </button>
+    </nav>
+
+    <!-- SIDE PANEL -->
+    <div id="panel" class="panel hidden">
+      <div class="panel-hdr">
+        <h3 id="panel-title">Panel</h3>
+        <button class="panel-close" id="btn-panel-close">✕</button>
+      </div>
+      <div id="panel-body" class="panel-body"></div>
+    </div>
+
+    <!-- MAP CONTROLS -->
+    <div id="map-ctrl-bar">
+      <button class="mc-btn active" id="mc-routes-toggle" title="Afficher/masquer les routes">✈ Routes</button>
+      <button class="mc-btn active" id="mc-airports-toggle" title="Afficher/masquer les aéroports">📍 Aéroports</button>
+      <button class="mc-btn" id="mc-night-toggle" title="Cycle jour/nuit">🌙 Nuit</button>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div id="notif-area"></div>
+
+    <!-- LIVE FLIGHT INFO (click on plane) -->
+    <div id="flight-tooltip" class="hidden">
+      <div class="ft-header">
+        <span class="ft-airline" id="ft-airline">-</span>
+        <span class="ft-num" id="ft-num">-</span>
+        <button id="ft-close">✕</button>
+      </div>
+      <div class="ft-body">
+        <div class="ft-row"><span>Trajet</span><strong id="ft-route">-</strong></div>
+        <div class="ft-row"><span>Phase</span><strong id="ft-phase">-</strong></div>
+        <div class="ft-row"><span>Altitude</span><strong id="ft-alt">-</strong></div>
+        <div class="ft-row"><span>Vitesse</span><strong id="ft-spd">-</strong></div>
+        <div class="ft-row"><span>PAX</span><strong id="ft-pax">-</strong></div>
+        <div class="ft-row"><span>ETA</span><strong id="ft-eta">-</strong></div>
+      </div>
+    </div>
+
+  </div><!-- /ui -->
+</div><!-- /game -->
+
+<!-- MODAL -->
+<div id="modal-overlay" class="hidden">
+  <div id="modal-box">
+    <div class="modal-hdr">
+      <h3 id="modal-title">-</h3>
+      <button id="btn-modal-close" class="modal-close-btn">✕</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/data/airports.js"></script>
+<script src="js/data/aircraft.js"></script>
+<script src="js/engine/gameState.js"></script>
+<script src="js/engine/save.js"></script>
+<script src="js/engine/economy.js"></script>
+<script src="js/engine/routes.js"></script>
+<script src="js/engine/flight.js"></script>
+<script src="js/engine/ai.js"></script>
+<script src="js/engine/mapEngine.js"></script>
+<script src="js/ui/ui.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>

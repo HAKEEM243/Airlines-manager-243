@@ -145,26 +145,41 @@ const GS = {
       alliances: this.alliances,
       cargo: this.cargo,
       market: this.market,
+      events: this.events,
+      marketing: this.marketing,
+      settings: this.settings,
       aiState: this.ai ? this.ai.serialize() : null,
       gameDate: this.gameDate.toISOString(),
       gameSpeed: this.gameSpeed,
       _nextId: this._nextId,
+      _tickAccum: this._tickAccum || 0,
     });
   },
 
   deserializeFromSave(data) {
     const d = JSON.parse(data);
     this.company = d.company;
-    this.fleet = d.fleet;
-    this.routes = d.routes;
+    this.fleet = (d.fleet || []).map(ac => {
+      if (ac.departureTime) ac.departureTime = new Date(ac.departureTime);
+      if (ac.arrivalTime) ac.arrivalTime = new Date(ac.arrivalTime);
+      return ac;
+    });
+    this.routes = (d.routes || []).map(r => {
+      if (r.createdAt) r.createdAt = new Date(r.createdAt);
+      return r;
+    });
     this.crew = d.crew;
     this.finances = d.finances;
-    this.alliances = d.alliances;
-    this.cargo = d.cargo;
+    this.alliances = d.alliances || [];
+    this.cargo = d.cargo || { contracts: [], dedicated: [] };
     this.market = d.market;
+    this.events = d.events || [];
+    this.marketing = d.marketing || { campaigns: [], loyaltyPoints: 0 };
+    if (d.settings) this.settings = { ...this.settings, ...d.settings };
     this.gameDate = new Date(d.gameDate);
     this.gameSpeed = d.gameSpeed;
     this._nextId = d._nextId;
+    this._tickAccum = d._tickAccum || 0;
     return d.aiState;
   },
 };

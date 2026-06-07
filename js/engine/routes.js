@@ -74,6 +74,7 @@ const RouteEngine = {
     aircraft.routeId = route.id;
     aircraft.departureTime = new Date(now);
     aircraft.arrivalTime = new Date(now.getTime() + durationHours * 3600 * 1000);
+    aircraft.durationHours = durationHours;
     aircraft.phase = 'ground';
     aircraft.progress = 0;
     aircraft.distanceKm = dist;

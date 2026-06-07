@@ -47,7 +47,10 @@ const FlightEngine = {
   },
 
   updateAircraftPosition(aircraft, gameMinutes, completions) {
-    const totalGameMs = aircraft.durationHours * 3600 * 1000;
+    const totalGameMs = aircraft.durationHours
+      ? aircraft.durationHours * 3600 * 1000
+      : (aircraft.arrivalTime - aircraft.departureTime);
+    if (!totalGameMs || isNaN(totalGameMs) || totalGameMs <= 0) return;
     const elapsedMs = GS.gameDate - aircraft.departureTime;
     aircraft.progress = Math.min(1, elapsedMs / totalGameMs);
 

@@ -41,8 +41,8 @@ const SaveSystem = {
       const data = localStorage.getItem(this.KEY);
       if (!data) return false;
       const aiState = GS.deserializeFromSave(data);
-      if (aiState && GS.ai) {
-        GS.ai.loadState(aiState);
+      if (aiState) {
+        AIEngine.loadAI(aiState);
       }
       return true;
     } catch (e) {

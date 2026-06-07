@@ -19,6 +19,7 @@ const AIEngine = {
       totalRevenue: 0,
       totalFlights: 0,
       tickCounter: 0,
+      enabled: true,
     };
     for (let i = 0; i < 3; i++) {
       const m = AIRCRAFT_MODELS[Math.floor(Math.random() * 12)];

@@ -66,13 +66,12 @@ const UI = {
 
   /* ===== FLEET PANEL ===== */
   renderFleet(body) {
-    const tabs = ['Mes Appareils', 'Marché', 'Avion Custom'];
-    let activeTab = 'owned';
+    let activeTab = GS.fleet.length === 0 ? 'market' : 'owned';
     const render = () => {
       body.innerHTML = `
         <div class="fleet-tabs">
           <button class="fleet-tab ${activeTab==='owned'?'active':''}" data-ft="owned">Mes Appareils (${GS.fleet.length})</button>
-          <button class="fleet-tab ${activeTab==='market'?'active':''}" data-ft="market">Marché</button>
+          <button class="fleet-tab ${activeTab==='market'?'active':''}" data-ft="market">Marché ✈</button>
           <button class="fleet-tab ${activeTab==='custom'?'active':''}" data-ft="custom">Custom</button>
         </div>
         <div id="fleet-content"></div>
@@ -90,7 +89,12 @@ const UI = {
 
   renderOwnedFleet(container) {
     if (!GS.fleet.length) {
-      container.innerHTML = `<div class="empty-state"><div class="es-icon">✈</div><p>Votre flotte est vide.<br>Achetez votre premier appareil dans le Marché.</p></div>`;
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="es-icon">✈</div>
+          <p>Votre flotte est vide.</p>
+          <p style="margin-top:8px;font-size:12px;color:var(--txt-dim)">Allez dans l'onglet <strong style="color:var(--cyan)">Marché</strong> pour acheter votre premier appareil.<br>Capital disponible : <strong style="color:var(--gold)">${GS.getBalanceFormatted()}</strong></p>
+        </div>`;
       return;
     }
     container.innerHTML = GS.fleet.map(ac => {
@@ -423,7 +427,14 @@ const UI = {
     const routes = GS.routes;
     body.innerHTML = `
       <button class="btn-primary w100" id="btn-new-route" style="margin-bottom:12px">+ Créer une nouvelle route</button>
-      ${routes.length ? routes.map(r => this.buildRouteCard(r)).join('') : `<div class="empty-state"><div class="es-icon">🗺</div><p>Aucune route active.<br>Créez votre première ligne commerciale.</p></div>`}
+      ${routes.length ? routes.map(r => this.buildRouteCard(r)).join('') : `
+        <div class="empty-state">
+          <div class="es-icon">🗺</div>
+          <p>Aucune route active.<br>Créez votre première ligne commerciale.</p>
+          <div style="margin-top:12px;font-size:12px;color:var(--txt-dim);line-height:1.5">
+            💡 Dans la Flotte → Marché, achetez un appareil,<br>puis revenez ici pour ouvrir une ligne.
+          </div>
+        </div>`}
     `;
     document.getElementById('btn-new-route')?.addEventListener('click', onNew);
     body.querySelectorAll('.route-card').forEach(card => {
@@ -553,7 +564,9 @@ const UI = {
                 </div>
               </label>`;
             }).join('')}
-          </div>` : `<div class="empty-state" style="margin-bottom:12px"><p>Aucun appareil disponible. Achetez-en un d'abord.</p></div>`}
+          </div>` : GS.fleet.length === 0
+            ? `<div class="empty-state" style="margin-bottom:12px"><p>Aucun appareil dans la flotte.<br><button class="btn-primary btn-sm" onclick="UI.openPanel('fleet')" style="margin-top:8px">✈ Acheter un appareil</button></p></div>`
+            : `<div class="empty-state" style="margin-bottom:12px"><p>Tous vos appareils sont en vol.<br><span style="font-size:12px;color:var(--txt-dim)">Attendez qu'un vol arrive à destination.</span></p></div>`}
 
         <div class="section-title">Configuration Cabine</div>
         <div class="cabin-config">
@@ -818,14 +831,25 @@ const UI = {
     const balance = GS.finances.balance;
     const totalRev = GS.getTotalRevenue();
     const ai = GS.ai;
+    const inAir = GS.getFleetInAir().length;
     body.innerHTML = `
       <div class="section-title">Vue d'Ensemble</div>
       <div class="dashboard-grid">
         <div class="kpi-card"><div class="kpi-label">Capital</div><div class="kpi-value ${balance<0?'negative':''}">${GS.getBalanceFormatted()}</div></div>
         <div class="kpi-card"><div class="kpi-label">Taux remplissage</div><div class="kpi-value ${lf>75?'positive':lf>50?'':'negative'}">${lf}%</div></div>
-        <div class="kpi-card"><div class="kpi-label">Flotte en vol</div><div class="kpi-value">${GS.getFleetInAir().length} / ${GS.fleet.length}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Flotte en vol</div><div class="kpi-value ${inAir>0?'positive':''}">${inAir} / ${GS.fleet.length}</div></div>
         <div class="kpi-card"><div class="kpi-label">Revenus ce mois</div><div class="kpi-value positive">+$${totalRev.toLocaleString()}</div></div>
       </div>
+      ${GS.routes.length === 0 ? `
+        <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
+          <div style="font-weight:700;color:var(--cyan);margin-bottom:8px">🚀 Pour commencer</div>
+          <div style="font-size:12px;color:var(--txt-dim);line-height:1.8">
+            1. <strong style="color:#fff">Flotte → Marché</strong> : Achetez un appareil<br>
+            2. <strong style="color:#fff">Routes → Créer</strong> : Ouvrez votre première ligne<br>
+            3. Regardez votre avion décoller sur la carte !<br>
+            <span style="color:var(--txt-muted)">💡 Admin → ajoutez des fonds pour accélérer le test</span>
+          </div>
+        </div>` : ''}
 
       <div class="section-title">Réputation</div>
       <div class="rep-display" style="margin-bottom:12px">

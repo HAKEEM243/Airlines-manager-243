@@ -9,6 +9,96 @@
   let monthTickCounter = 0;
   let lastDayTick = 0;
 
+  /* ===== STARTER CONTENT FOR NEW GAME ===== */
+  function giveStarterContent() {
+    const hub = getAirport(GS.company.hub);
+    if (!hub) return;
+
+    // Free starter ATR-72
+    const starterAc = {
+      id: GS.genId(),
+      modelId: 'atr72',
+      name: GS.company.iata + '-001',
+      status: 'available',
+      condition: 95,
+      ageHours: 0,
+      routeId: null,
+      flightId: null,
+      phase: 'ground',
+      progress: 0,
+      lat: hub.lat,
+      lon: hub.lon,
+      heading: 90,
+      passengers: 0,
+      currentAlt: 0,
+      currentSpeed: 0,
+      leased: false,
+      leaseCost: 0,
+    };
+    GS.fleet.push(starterAc);
+
+    // Find best reachable destination (within ATR-72 range, good demand)
+    const model = getAircraftModel('atr72');
+    if (model) {
+      const candidates = AIRPORTS.filter(ap => {
+        if (ap.iata === hub.iata) return false;
+        const dist = calcDistance(hub, ap);
+        return dist > 150 && dist <= model.range * 0.9 && ap.demandPax >= 2000;
+      }).sort((a, b) => b.demandPax - a.demandPax);
+
+      if (candidates.length > 0) {
+        const dest = candidates[0];
+        const result = RouteEngine.createRoute(hub.iata, dest.iata, starterAc.id, {
+          cabinConfig: { economy: 0.85, premeco: 0.10, business: 0.05, first: 0 },
+        });
+        if (result.success) {
+          MapEngine.addRoutePolyline(result.route);
+        }
+      }
+    }
+    UI.updateHeader();
+  }
+
+  /* ===== WELCOME TUTORIAL ===== */
+  function showWelcomeTutorial() {
+    const firstRoute = GS.routes[0];
+    const firstAc = GS.fleet[0];
+    const destName = firstRoute ? (getAirport(firstRoute.destination)?.city || firstRoute.destination) : '-';
+    const profit = firstRoute ? Economy.calcRouteProfit(firstRoute) : 0;
+    UI.showModal('🎮 Bienvenue dans Hakvision Aircraft !', `
+      <div style="text-align:center;padding:8px 0 16px">
+        <div style="font-size:48px;margin-bottom:10px">✈</div>
+        <h3 style="color:#fff;font-size:16px;margin-bottom:6px">Votre empire aérien commence !</h3>
+        <p style="color:var(--txt-dim);font-size:13px;line-height:1.6">
+          Capital de départ : <strong style="color:var(--gold)">$50,000,000</strong><br>
+          Vous avez reçu un <strong style="color:var(--cyan)">ATR 72-600 gratuit</strong>
+          ${firstRoute ? ` en route vers <strong style="color:var(--cyan)">${destName}</strong>` : ''} !
+        </p>
+      </div>
+      ${firstRoute ? `<div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:var(--radius);padding:12px;margin-bottom:14px;font-size:12px;text-align:center">
+        <div style="color:var(--green);font-weight:700;font-size:14px">Premier vol lancé automatiquement !</div>
+        <div style="color:var(--txt-dim);margin-top:4px">${firstRoute.origin} → ${firstRoute.destination} · Profit estimé : <span style="color:${profit>0?'var(--green)':'var(--red)'}">${profit>0?'+':''}$${Math.abs(profit).toLocaleString()}</span>/vol</div>
+      </div>` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
+          <span style="font-size:22px;flex-shrink:0">✈</span>
+          <div><strong style="color:#fff;font-size:13px">Flotte</strong> → Achetez d'autres appareils dans le Marché<br><span style="font-size:11px;color:var(--txt-dim)">ATR-42 dès $21M · A320 à $101M</span></div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
+          <span style="font-size:22px;flex-shrink:0">🗺</span>
+          <div><strong style="color:#fff;font-size:13px">Routes</strong> → Créez de nouvelles liaisons aériennes<br><span style="font-size:11px;color:var(--txt-dim)">Sélectionnez départ, destination et appareil</span></div>
+        </div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
+          <span style="font-size:22px;flex-shrink:0">⚡</span>
+          <div><strong style="color:#fff;font-size:13px">Admin</strong> → Ajoutez des fonds ou des appareils pour tester<br><span style="font-size:11px;color:var(--txt-dim)">Vitesse 5× activée — les vols durent quelques secondes</span></div>
+        </div>
+      </div>
+    `, [
+      { label: '🗺 Créer une route', cls: 'btn-primary', action: () => { UI.closeModal(); UI.openPanel('routes'); } },
+      { label: '✈ Voir la flotte', cls: 'btn-secondary', action: () => { UI.closeModal(); UI.openPanel('fleet'); } },
+    ]);
+  }
+
   /* ===== SPLASH SCREEN SETUP ===== */
   function initSplash() {
     const hasSave = SaveSystem.hasSave();
@@ -124,12 +214,20 @@
       MapEngine.renderRoutes();
     }
     UI.updateHeader();
+
+    // Default to 5× speed for immediate visual feedback
+    GS.gameSpeed = 5;
+    GS.paused = false;
+    document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.speed == 5));
+
     startGameLoop();
     startRenderLoop();
     SaveSystem.startAutoSave();
+
     if (isNew) {
-      UI.notify(`Bienvenue, ${GS.company.name} ! Votre aventure commence.`, 'success', 5000);
-      setTimeout(() => UI.notify('Conseil : Achetez des appareils et créez vos premières routes.', 'info', 6000), 1500);
+      giveStarterContent();
+      setTimeout(() => MapEngine.renderRoutes(), 200);
+      setTimeout(() => showWelcomeTutorial(), 800);
     } else {
       UI.notify(`Reprise de la partie — ${GS.company.name}`, 'success', 3000);
     }

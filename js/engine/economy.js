@@ -132,9 +132,12 @@ const Economy = {
     GS.addToBalance(-crewSalaries, 'crew', 'Salaires mensuels');
     GS.finances.costs.crew += crewSalaries;
     if (GS.marketing.campaigns.length > 0) {
-      const mktCost = GS.marketing.campaigns.reduce((s, c) => s + c.monthlyCost, 0);
-      GS.addToBalance(-mktCost, 'marketing', 'Campagnes marketing');
-      GS.finances.costs.marketing += mktCost;
+      const MONTHLY_COSTS = { social: 15000, tv: 80000, loyalty: 30000, b2b: 45000 };
+      const mktCost = GS.marketing.campaigns.reduce((s, c) => s + (MONTHLY_COSTS[c] || 0), 0);
+      if (mktCost > 0) {
+        GS.addToBalance(-mktCost, 'marketing', 'Campagnes marketing');
+        GS.finances.costs.marketing += mktCost;
+      }
     }
     GS.alliances.forEach(aId => {
       const a = ALLIANCES.find(x => x.id === aId);

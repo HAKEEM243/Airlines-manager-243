@@ -179,10 +179,11 @@ const FlightEngine = {
     const duration = aircraft.durationHours || 0;
     aircraft.ageHours = (aircraft.ageHours || 0) + duration;
     aircraft.condition = Math.max(10, (aircraft.condition || 100) - duration * 0.05);
+    const profitStr = profit != null ? ` · ${profit > 0 ? '+' : ''}$${Math.abs(profit || 0).toLocaleString()}` : '';
     UI.notify(
-      `✈ Vol ${aircraft.flightId} arrivé — ${aircraft.origin} → ${aircraft.destination}`,
+      `✈ Vol ${aircraft.flightId} arrivé — ${aircraft.origin} → ${aircraft.destination}${profitStr}`,
       profit > 0 ? 'success' : 'warning',
-      4000
+      4500
     );
     if (route && route.status === 'active') {
       setTimeout(() => {

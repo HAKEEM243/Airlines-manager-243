@@ -38,6 +38,8 @@ const GS = {
       hub: hubIata,
       reputation: 0,
       level: 1,
+      xp: 0,
+      achievements: [],
       founded: new Date(this.gameDate),
       logo: '✈',
       alliance: null,
@@ -54,6 +56,7 @@ const GS = {
       history: [],
       revenue: { pax: 0, cargo: 0, mail: 0 },
       costs: { fuel: 0, maintenance: 0, fees: 0, crew: 0, marketing: 0 },
+      loans: [],
       lastMonthPL: 0,
     };
     this.alliances = [];
@@ -102,11 +105,6 @@ const GS = {
 
   addReputation(delta) {
     this.company.reputation = Math.max(0, Math.min(100, this.company.reputation + delta));
-    const lvl = Math.floor(this.company.reputation / 20) + 1;
-    if (lvl > this.company.level) {
-      this.company.level = lvl;
-      return true; // level up
-    }
     return false;
   },
 
@@ -170,6 +168,13 @@ const GS = {
     });
     this.crew = d.crew;
     this.finances = d.finances;
+    if (!this.finances.loans) this.finances.loans = [];
+    if (this.company) {
+      if (typeof this.company.xp !== 'number') this.company.xp = 0;
+      if (!Array.isArray(this.company.achievements)) this.company.achievements = [];
+      // Recompute level from XP for saves that predate the progression system
+      if (typeof Progression !== 'undefined') this.company.level = Progression.getProgress().level;
+    }
     this.alliances = d.alliances || [];
     this.cargo = d.cargo || { contracts: [], dedicated: [] };
     this.market = d.market;

@@ -131,8 +131,12 @@ const MapEngine = {
     const o = getAirport(route.origin);
     const d = getAirport(route.destination);
     if (!o || !d) return;
-    const pts = geodesicPoints(o, d, 80);
-    const pl = L.polyline(pts, {
+    // Route through waypoints (escales) so the drawn line matches the real path
+    const stops = [route.origin, ...(route.waypoints || []), route.destination];
+    const leg = (typeof RouteEngine !== 'undefined' && RouteEngine.buildLegPath)
+      ? RouteEngine.buildLegPath(stops)
+      : { points: geodesicPoints(o, d, 80) };
+    const pl = L.polyline(leg.points, {
       color: '#00d4ff',
       weight: 1.5,
       opacity: 0.5,
@@ -143,6 +147,14 @@ const MapEngine = {
     });
     pl.addTo(this.layers.routes);
     this.polylines[route.id] = pl;
+    // Mark waypoint airports along the route
+    (route.waypoints || []).forEach(w => {
+      const ap = getAirport(w);
+      if (ap) {
+        L.circleMarker([ap.lat, ap.lon], { radius: 3, color: '#ffd700', fillColor: '#ffd700', fillOpacity: 0.9, weight: 1 })
+          .addTo(this.layers.routes);
+      }
+    });
   },
 
   removeRoutePolyline(routeId) {
@@ -240,19 +252,36 @@ const MapEngine = {
   showFlightTooltip(aircraft) {
     const tooltip = document.getElementById('flight-tooltip');
     if (!tooltip) return;
-    const route = GS.getRoute(aircraft.routeId);
-    document.getElementById('ft-airline').textContent = GS.company ? GS.company.name : '-';
-    document.getElementById('ft-num').textContent = aircraft.flightId || '-';
-    document.getElementById('ft-route').textContent = route ? `${route.origin} → ${route.destination}` : '-';
-    document.getElementById('ft-phase').textContent = FlightEngine.getPhaseLabel(aircraft.phase);
-    document.getElementById('ft-alt').textContent = aircraft.currentAlt ? `${aircraft.currentAlt.toLocaleString()} m` : '0 m';
-    document.getElementById('ft-spd').textContent = aircraft.currentSpeed ? `${aircraft.currentSpeed} km/h` : '-';
-    document.getElementById('ft-pax').textContent = aircraft.passengers || 0;
-    document.getElementById('ft-eta').textContent = FlightEngine.getETA(aircraft);
+    this._activeTooltipId = aircraft.id;
+    this.updateFlightTooltip();
     tooltip.classList.remove('hidden');
     if (aircraft.lat && aircraft.lon) {
       this.map.panTo([aircraft.lat, aircraft.lon], { animate: true, duration: 0.5 });
     }
+  },
+
+  // Live-refreshes the open flight tooltip so altitude/speed/ETA/position update in real time
+  updateFlightTooltip() {
+    const tooltip = document.getElementById('flight-tooltip');
+    if (!tooltip || tooltip.classList.contains('hidden')) return;
+    if (this._activeTooltipId == null) return;
+    const aircraft = GS.getAircraft(this._activeTooltipId);
+    if (!aircraft || aircraft.status !== 'flying') {
+      tooltip.classList.add('hidden');
+      this._activeTooltipId = null;
+      return;
+    }
+    const route = GS.getRoute(aircraft.routeId);
+    const pct = Math.round((aircraft.progress || 0) * 100);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('ft-airline', GS.company ? GS.company.name : '-');
+    set('ft-num', aircraft.flightId || '-');
+    set('ft-route', `${aircraft.origin || route?.origin || '?'} → ${aircraft.destination || route?.destination || '?'} · ${pct}%`);
+    set('ft-phase', FlightEngine.getPhaseLabel(aircraft.phase));
+    set('ft-alt', `${(aircraft.currentAlt || 0).toLocaleString()} m`);
+    set('ft-spd', `${aircraft.currentSpeed || 0} km/h`);
+    set('ft-pax', aircraft.passengers || 0);
+    set('ft-eta', FlightEngine.getETA(aircraft));
   },
 
   focusHub() {
@@ -307,5 +336,6 @@ const MapEngine = {
     if (!this.initialized) return;
     this.renderAircraft();
     this.renderAIAircraft();
+    this.updateFlightTooltip();
   },
 };

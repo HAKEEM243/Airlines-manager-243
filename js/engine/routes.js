@@ -43,6 +43,7 @@ const RouteEngine = {
       cabinConfig,
       serviceLevel,
       frequency: options.frequency || 1,
+      autoReturn: options.autoReturn !== false,
       totalFlights: 0,
       totalRevenue: 0,
       totalProfit: 0,
@@ -55,39 +56,85 @@ const RouteEngine = {
     aircraft.status = 'assigned';
     aircraft.routeId = route.id;
     this.launchFlight(route, aircraft);
+    if (typeof Progression !== 'undefined') {
+      Progression.addXP(40, 'new_route');
+      Progression.checkAchievements();
+    }
     return { success: true, route };
   },
 
+  // Builds a multi-segment geodesic path through an ordered list of IATA stops.
+  // Supports stopovers (escales) so the aircraft visibly routes via waypoints.
+  buildLegPath(stops) {
+    let points = [];
+    let totalDist = 0;
+    const labels = [];
+    for (let i = 0; i < stops.length - 1; i++) {
+      const a = getAirport(stops[i]);
+      const b = getAirport(stops[i + 1]);
+      if (!a || !b) continue;
+      totalDist += calcDistance(a, b);
+      const seg = geodesicPoints(a, b, 50);
+      if (i > 0 && seg.length) seg.shift(); // avoid duplicate junction point
+      points = points.concat(seg);
+      labels.push(stops[i]);
+    }
+    labels.push(stops[stops.length - 1]);
+    return { points, totalDist, stops: labels };
+  },
+
+  // Launches a flight from the aircraft's CURRENT location toward the far
+  // endpoint of the route (outbound origin→dest, or return dest→origin),
+  // routing through any waypoints along the way.
   launchFlight(route, aircraft) {
-    if (!aircraft || !route) return;
-    const o = getAirport(route.origin);
-    const d = getAirport(route.destination);
-    if (!o || !d) return;
+    return this.dispatchFlight(route, aircraft);
+  },
+
+  dispatchFlight(route, aircraft) {
+    if (!aircraft || !route) return { error: 'Données invalides.' };
     const model = getAircraftModel(aircraft.modelId);
-    if (!model) return;
+    if (!model) return { error: 'Modèle introuvable.' };
+    if (aircraft.status === 'flying') return { error: 'Appareil déjà en vol.' };
+
+    const here = aircraft.locationIata || route.origin;
+    const atDest = here === route.destination;
+    const wp = route.waypoints || [];
+    const stops = atDest
+      ? [route.destination, ...[...wp].reverse(), route.origin]
+      : [route.origin, ...wp, route.destination];
+
+    const fromIata = stops[0];
+    const toIata = stops[stops.length - 1];
+    const fromAp = getAirport(fromIata);
+    const toAp = getAirport(toIata);
+    if (!fromAp || !toAp) return { error: 'Aéroports invalides.' };
+
+    const leg = this.buildLegPath(stops);
+    const durationHours = calcFlightDuration(leg.totalDist, model);
     const now = GS.gameDate;
-    const dist = route.distanceKm;
-    const durationHours = route.durationHours;
-    const durationMs = durationHours * 3600 * 1000 / (GS.gameSpeed || 1);
+
     aircraft.status = 'flying';
-    aircraft.flightId = GSHelpers.createFlightId(route.origin, route.destination);
+    aircraft.flightId = GSHelpers.createFlightId(fromIata, toIata);
     aircraft.routeId = route.id;
     aircraft.departureTime = new Date(now);
     aircraft.arrivalTime = new Date(now.getTime() + durationHours * 3600 * 1000);
     aircraft.durationHours = durationHours;
-    aircraft.phase = 'ground';
+    aircraft.phase = 'taxiing';
     aircraft.progress = 0;
-    aircraft.distanceKm = dist;
-    aircraft.origin = route.origin;
-    aircraft.destination = route.destination;
+    aircraft.distanceKm = leg.totalDist;
+    aircraft.origin = fromIata;
+    aircraft.destination = toIata;
+    aircraft.legStops = leg.stops;
     aircraft.passengers = Math.round(model.paxCapacity * (route.loadFactor || 0.82));
     aircraft.currentAlt = 0;
     aircraft.currentSpeed = 0;
-    aircraft.lat = o.lat;
-    aircraft.lon = o.lon;
-    aircraft.heading = this.calcBearing(o.lat, o.lon, d.lat, d.lon);
-    const pts = geodesicPoints(o, d, 100);
-    aircraft.pathPoints = pts;
+    aircraft.lat = fromAp.lat;
+    aircraft.lon = fromAp.lon;
+    aircraft.locationIata = null;
+    aircraft.pathPoints = leg.points;
+    const nxt = leg.points[1] || [toAp.lat, toAp.lon];
+    aircraft.heading = this.calcBearing(fromAp.lat, fromAp.lon, nxt[0], nxt[1]);
+    return { success: true };
   },
 
   calcTotalDistance(origin, destination, waypoints = []) {
@@ -103,14 +150,32 @@ const RouteEngine = {
 
   estimateLoadFactor(distKm, demand, model, serviceLevel = 1) {
     if (!demand || !model) return 0.5;
-    const capacityRatio = demand / model.paxCapacity;
-    let lf = Math.min(0.98, 0.55 + capacityRatio * 0.3);
+    // Right-sizing curve: matching capacity to demand is rewarded; an
+    // oversized aircraft on a thin route fills poorly and loses money.
+    const ratio = demand / model.paxCapacity;
+    let lf = 0.97 * (ratio / (ratio + 0.4));
     lf += (serviceLevel - 1) * 0.04;
-    if (GS.alliances.includes('skyworld')) lf += 0.05;
+    if (GS.alliances.includes('skyworld')) lf += 0.04;
     if (GS.alliances.includes('pacifica')) lf += 0.04;
     const rep = GS.company ? GS.company.reputation : 0;
-    lf += rep * 0.002;
-    return Math.min(0.98, Math.max(0.35, lf));
+    lf += rep * 0.0015;
+    return Math.min(0.98, Math.max(0.30, lf));
+  },
+
+  // Suggests an ideal seat count for a route's daily demand
+  getRecommendedCapacity(demand) {
+    // Target a healthy ~85% load factor: ratio ≈ 1.9 gives lf≈0.80
+    return Math.max(50, Math.round(demand / 1.9));
+  },
+
+  // Rates how well an aircraft's capacity fits a route's demand
+  rateRightSizing(demand, capacity) {
+    if (!demand || !capacity) return { label: '—', cls: 'mid', ratio: 0 };
+    const ratio = demand / capacity;
+    if (ratio < 0.6) return { label: 'Surdimensionné', cls: 'bad', ratio };
+    if (ratio < 1.1) return { label: 'Un peu grand', cls: 'mid', ratio };
+    if (ratio <= 4) return { label: 'Bon dimensionnement', cls: 'good', ratio };
+    return { label: 'Forte demande — agrandir', cls: 'mid', ratio };
   },
 
   removeRoute(routeId) {

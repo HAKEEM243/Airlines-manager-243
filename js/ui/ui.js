@@ -116,6 +116,7 @@ const UI = {
           <span>🛣 ${model ? model.range+'km' : '-'}</span>
           <span>👤 ${model ? model.paxCapacity+' PAX' : '-'}</span>
           <span>🔧 ${Math.round(ac.condition||100)}%</span>
+          ${(typeof Maintenance!=='undefined' && Maintenance.getStatus(ac)?.due) ? `<span class="text-red" title="Maintenance en retard">🔧 À réviser</span>` : ''}
           ${ac.flightId ? `<span class="text-cyan">✈ ${ac.flightId}</span>` : ''}
         </div>
         ${ac.status==='flying' ? `<div style="margin-top:6px;"><div class="progress-bar"><div class="progress-fill fill-cyan" style="width:${Math.round((ac.progress||0)*100)}%"></div></div><div style="font-size:10px;color:var(--txt-dim);margin-top:2px;">${FlightEngine.getPhaseLabel(ac.phase)} · ${Math.round((ac.progress||0)*100)}%</div></div>` : ''}
@@ -159,12 +160,13 @@ const UI = {
         </div>
       </div>
       <div style="font-size:12px;color:var(--txt-dim);margin-bottom:8px;">Heures de vol : ${Math.round(aircraft.ageHours||0)} h</div>
+      ${this.buildMaintenanceBlock(aircraft)}
       <div class="ac-actions">
         ${aircraft.status === 'ground' || aircraft.status === 'available' ? `<button class="btn-primary btn-sm" id="btn-assign">Assigner une route</button>` : ''}
-        ${aircraft.status === 'ground' ? `<button class="btn-secondary btn-sm" id="btn-maintenance">Maintenance ($${Math.round(model.purchasePrice*0.01).toLocaleString()})</button>` : ''}
         <button class="btn-danger btn-sm" id="btn-sell">Revendre ($${sellPrice.toLocaleString()})</button>
       </div>
     `, []);
+    this.bindMaintenanceButtons(aircraft);
     document.getElementById('btn-sell')?.addEventListener('click', () => {
       if (aircraft.status === 'flying') { this.notify('Impossible de vendre un appareil en vol.','error'); return; }
       GS.addToBalance(sellPrice, 'fleet', `Vente ${aircraft.name}`);
@@ -179,13 +181,43 @@ const UI = {
       this.closeModal();
       this.openPanel('routes');
     });
-    document.getElementById('btn-maintenance')?.addEventListener('click', () => {
-      const cost = Math.round(model.purchasePrice * 0.01);
-      if (GS.finances.balance < cost) { this.notify('Fonds insuffisants.', 'error'); return; }
-      GS.addToBalance(-cost, 'maintenance', `Maintenance ${aircraft.name}`);
-      aircraft.condition = Math.min(100, (aircraft.condition||100) + 25);
-      this.closeModal();
-      this.notify(`Maintenance de ${aircraft.name} effectuée.`, 'success');
+  },
+
+  buildMaintenanceBlock(aircraft) {
+    if (typeof Maintenance === 'undefined') return '';
+    const st = Maintenance.getStatus(aircraft);
+    if (!st) return '';
+    const pct = Math.min(100, Math.round((st.sinceHours / st.interval) * 100));
+    const statusCls = st.due ? 'mnt-due' : pct > 75 ? 'mnt-soon' : 'mnt-ok';
+    const statusTxt = st.due ? `⚠ ${st.label} EN RETARD` : pct > 75 ? `${st.label} bientôt` : `${st.label} OK`;
+    const canDo = aircraft.status !== 'flying';
+    return `
+      <div class="mnt-block">
+        <div class="mnt-head">
+          <span class="mnt-title">🔧 Maintenance</span>
+          <span class="mnt-badge ${statusCls}">${statusTxt}</span>
+        </div>
+        <div class="mnt-bar"><div class="mnt-bar-fill ${statusCls}" style="width:${pct}%"></div></div>
+        <div class="mnt-info">${st.desc} · ${st.due ? `en retard de ${st.sinceHours - st.interval} h` : `dans ${st.remainingHours} h`}</div>
+        ${st.due && !canDo ? `<div class="mnt-warn">L'appareil doit être au sol pour la maintenance.</div>` : ''}
+        ${canDo ? `<div class="mnt-actions">
+          <button class="mnt-btn ${st.dueA||st.due?'urgent':''}" data-check="A">Check A · $${(getAircraftModel(aircraft.modelId).purchasePrice*0.004/1000).toFixed(0)}K</button>
+          <button class="mnt-btn ${st.dueC?'urgent':''}" data-check="C">Check C · $${(getAircraftModel(aircraft.modelId).purchasePrice*0.02/1e6).toFixed(2)}M</button>
+          <button class="mnt-btn ${st.dueD?'urgent':''}" data-check="D">Check D · $${(getAircraftModel(aircraft.modelId).purchasePrice*0.06/1e6).toFixed(2)}M</button>
+        </div>` : ''}
+      </div>`;
+  },
+
+  bindMaintenanceButtons(aircraft) {
+    document.querySelectorAll('.mnt-btn[data-check]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const result = Maintenance.performCheck(aircraft, btn.dataset.check);
+        if (result.error) { this.notify(result.error, 'error'); return; }
+        this.notify(`${Maintenance.CHECKS[btn.dataset.check].label} effectué sur ${aircraft.name} ($${result.cost.toLocaleString()}).`, 'success');
+        this.closeModal();
+        this.showAircraftDetail(aircraft);
+        this.updateHeader();
+      });
     });
   },
 
@@ -222,9 +254,16 @@ const UI = {
     if (!models.length) return '<div class="empty-state"><div class="es-icon">🔍</div><p>Aucun appareil trouvé.</p></div>';
     const catLabel = { turboprop:'Turbopropulseur', regional_jet:'Jet Régional', narrowbody:'Court-courrier', widebody:'Long-courrier', cargo:'Cargo', supersonic:'Supersonique' };
     const canAfford = m => GS.finances.balance >= m.purchasePrice;
-    return models.map(m => `
-      <div class="mac-v2" data-macid="${m.id}">
-        <div class="mac-v2-illustration">${typeof getAircraftImage === 'function' ? getAircraftImage(m.category) : ''}</div>
+    const hasProg = typeof Progression !== 'undefined';
+    return models.map(m => {
+      const locked = hasProg && !Progression.isCategoryUnlocked(m.category);
+      const unlockLvl = hasProg ? Progression.categoryUnlockLevel(m.category) : 1;
+      return `
+      <div class="mac-v2 ${locked?'mac-v2-locked':''}" data-macid="${m.id}">
+        <div class="mac-v2-illustration">
+          ${typeof getAircraftImage === 'function' ? getAircraftImage(m.category) : ''}
+          ${locked ? `<div class="mac-v2-lock-overlay"><div class="mac-v2-lock-ico">🔒</div><div class="mac-v2-lock-txt">Niveau ${unlockLvl} requis</div></div>` : ''}
+        </div>
         <div class="mac-v2-body">
           <div class="mac-v2-top">
             <div class="mac-v2-title-block">
@@ -260,16 +299,18 @@ const UI = {
           </div>
           <p class="mac-v2-desc">${m.description}</p>
           <div class="mac-v2-actions">
-            <button class="mac-v2-btn-buy ${canAfford(m)?'':'mac-v2-btn-disabled'}" data-buy="${m.id}" ${canAfford(m)?'':'disabled'}>
-              <span>✈</span> Acheter
-            </button>
-            <button class="mac-v2-btn-lease" data-lease="${m.id}">
-              <span>📋</span> Louer
-            </button>
+            ${locked
+              ? `<button class="mac-v2-btn-buy mac-v2-btn-disabled" disabled><span>🔒</span> Débloqué au niveau ${unlockLvl}</button>`
+              : `<button class="mac-v2-btn-buy ${canAfford(m)?'':'mac-v2-btn-disabled'}" data-buy="${m.id}" ${canAfford(m)?'':'disabled'}>
+                  <span>✈</span> Acheter
+                </button>
+                <button class="mac-v2-btn-lease" data-lease="${m.id}">
+                  <span>📋</span> Louer
+                </button>`}
           </div>
         </div>
       </div>
-    `).join('');
+    `;}).join('');
   },
 
   bindMarketButtons(container) {
@@ -284,6 +325,10 @@ const UI = {
   buyAircraft(modelId, lease) {
     const model = getAircraftModel(modelId);
     if (!model) return;
+    if (typeof Progression !== 'undefined' && !Progression.isCategoryUnlocked(model.category)) {
+      this.notify(`Cet appareil se débloque au niveau ${Progression.categoryUnlockLevel(model.category)}.`, 'warning');
+      return;
+    }
     const cost = lease ? Math.round(model.purchasePrice * 0.002) : model.purchasePrice;
     if (!lease && GS.finances.balance < cost) {
       this.notify('Fonds insuffisants.', 'error'); return;
@@ -329,11 +374,24 @@ const UI = {
         this.refreshPanel();
         this.notify(`${name} ajouté à votre flotte !`, 'success');
         if (GS.company) GS.addReputation(0.5);
+        if (typeof Progression !== 'undefined') {
+          Progression.addXP(lease ? 15 : 30, 'aircraft');
+          Progression.checkAchievements();
+        }
       }},
     ]);
   },
 
   renderCustomEditor(container) {
+    if (typeof Progression !== 'undefined' && !Progression.isCustomUnlocked()) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="es-icon">🔒</div>
+          <p>L'éditeur d'appareil personnalisé se débloque au <strong style="color:var(--cyan)">niveau ${Progression.CUSTOM_EDITOR_LEVEL}</strong>.</p>
+          <p style="margin-top:8px;font-size:12px;color:var(--txt-dim)">Niveau actuel : ${Progression.getLevel()} — continuez à développer votre réseau pour le débloquer.</p>
+        </div>`;
+      return;
+    }
     const baseModels = AIRCRAFT_MODELS.filter(m => m.category !== 'cargo' && m.category !== 'supersonic');
     let selectedBase = baseModels[0];
     let customData = {
@@ -564,8 +622,9 @@ const UI = {
         const aircraft = GS.fleet.find(a => a.routeId === route.id);
         if (!aircraft) { this.notify('Aucun appareil assigné à cette route.','error'); return; }
         if (aircraft.status === 'flying') { this.notify('Cet appareil est déjà en vol.','warning'); return; }
-        RouteEngine.launchFlight(route, aircraft);
-        this.notify(`✈ ${aircraft.name} — départ ${route.origin} → ${route.destination}`, 'success');
+        const result = RouteEngine.dispatchFlight(route, aircraft);
+        if (result && result.error) { this.notify(result.error, 'error'); return; }
+        this.notify(`✈ ${aircraft.name} — départ ${aircraft.origin} → ${aircraft.destination}`, 'success');
         this.refreshPanel();
       });
     });
@@ -591,8 +650,8 @@ const UI = {
           <span class="itin-arrow">→</span>
           <span class="itin-iata">${r.destination}</span>
         </div>
-        <div class="itin-v2-cities">${o?.city||r.origin} → ${d?.city||r.destination}</div>
-        <div class="itin-v2-aircraft">${aircraft ? `${model?.icon||'✈'} ${aircraft.name} · ${model?.name||''}` : '<span class="text-red">Aucun appareil assigné</span>'}</div>
+        <div class="itin-v2-cities">${o?.city||r.origin}${r.waypoints?.length?` › ${r.waypoints.join(' › ')}`:''} → ${d?.city||r.destination}</div>
+        <div class="itin-v2-aircraft">${aircraft ? `${model?.icon||'✈'} ${aircraft.name}${(!isFlying && aircraft.locationIata)?` · <span class="text-cyan">au sol à ${aircraft.locationIata}</span>`:''}` : '<span class="text-red">Aucun appareil assigné</span>'}</div>
       </div>
       <div class="itin-v2-mid">
         <div class="itin-v2-stat">
@@ -618,7 +677,9 @@ const UI = {
                <div class="itin-flying-dot"></div>
                <span>En vol ${Math.round((aircraft.progress||0)*100)}%</span>
              </div>`
-          : `<button class="btn-depart" data-rid="${r.id}">▶ Départ</button>`
+          : aircraft
+            ? `<button class="btn-depart" data-rid="${r.id}">${aircraft.locationIata === r.destination ? '↩ Retour' : '▶ Départ'}</button>`
+            : ''
         }
       </div>
     </div>`;
@@ -638,8 +699,16 @@ const UI = {
         <div class="kpi-card"><div class="kpi-label">Total vols</div><div class="kpi-value">${route.totalFlights||0}</div></div>
         <div class="kpi-card"><div class="kpi-label">Revenue total</div><div class="kpi-value">$${(route.totalRevenue||0).toLocaleString()}</div></div>
       </div>
-      <div style="font-size:12px;color:var(--txt-dim);margin-bottom:8px">Appareil : ${aircraft ? aircraft.name : 'Aucun'}</div>
+      <div style="font-size:12px;color:var(--txt-dim);margin-bottom:8px">Appareil : ${aircraft ? aircraft.name : 'Aucun'}${aircraft && aircraft.status!=='flying' && aircraft.locationIata ? ` · au sol à ${aircraft.locationIata}` : ''}</div>
       ${route.waypoints?.length ? `<div style="font-size:12px;color:var(--txt-dim);margin-bottom:8px">Escales : ${route.waypoints.join(' → ')}</div>` : ''}
+      <div class="route-toggle-row">
+        <div>
+          <div class="rt-toggle-name">Vols retour automatiques</div>
+          <div class="rt-toggle-desc">${route.autoReturn!==false ? 'L\'appareil enchaîne aller-retour en continu' : 'Vous lancez chaque départ manuellement (bouton Départ/Retour)'}</div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="rt-auto" ${route.autoReturn!==false?'checked':''}><span class="toggle-slider"></span></label>
+      </div>
+      ${profit < 0 ? `<div class="route-loss-warn">⚠ Cette route perd de l'argent. L'appareil est probablement trop grand pour la demande, ou la distance trop coûteuse. Essayez un appareil plus petit ou une destination plus fréquentée.</div>` : ''}
     `, [
       { label: 'Supprimer la route', cls: 'btn-danger', action: () => {
         RouteEngine.removeRoute(route.id);
@@ -650,6 +719,16 @@ const UI = {
       }},
       { label: 'Fermer', cls: 'btn-ghost', action: () => this.closeModal() },
     ]);
+    document.getElementById('rt-auto')?.addEventListener('change', e => {
+      route.autoReturn = e.target.checked;
+      this.notify(route.autoReturn ? 'Vols retour automatiques activés.' : 'Mode manuel : lancez les départs depuis la liste des routes.', 'info');
+      // If turning auto back on and the aircraft is parked, resume immediately
+      if (route.autoReturn && aircraft && aircraft.status === 'ground') {
+        RouteEngine.dispatchFlight(route, aircraft);
+      }
+      this.closeModal();
+      this.refreshPanel();
+    });
   },
 
   renderRouteBuilder(body, onBack) {
@@ -702,7 +781,7 @@ const UI = {
         ${routeInfo ? `<div class="rb-route-calc">
           <div class="rb-calc-row"><span>Distance orthodromique</span><strong>${routeInfo.distance.toLocaleString()} km</strong></div>
           <div class="rb-calc-row"><span>Demande estimée</span><strong>${routeInfo.demand.toLocaleString()} PAX/j</strong></div>
-          <div class="rb-calc-row"><span>Appareils compatibles</span><strong>${routeInfo.recommended.length}</strong></div>
+          <div class="rb-calc-row"><span>Capacité idéale</span><strong>~${RouteEngine.getRecommendedCapacity(routeInfo.demand).toLocaleString()} sièges</strong></div>
         </div>` : ''}
 
         <div class="section-title" style="margin-top:16px">Sélectionner un Appareil</div>
@@ -711,10 +790,11 @@ const UI = {
             ${availableAircraft.map(ac => {
               const m = getAircraftModel(ac.modelId);
               const ok = routeInfo && m ? canFlyRoute(m, routeInfo.distance) : true;
+              const fit = (routeInfo && m) ? RouteEngine.rateRightSizing(routeInfo.demand, m.paxCapacity) : null;
               return `<label style="display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1px solid ${selectedAircraftId===ac.id?'var(--border-h)':'var(--border)'};border-radius:8px;padding:10px;cursor:pointer;opacity:${ok?1:0.4}">
                 <input type="radio" name="ac-sel" value="${ac.id}" ${selectedAircraftId===ac.id?'checked':''} ${ok?'':'disabled'}>
-                <div>
-                  <div style="font-weight:600;font-size:13px">${ac.name}</div>
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:13px">${ac.name} ${fit&&ok?`<span class="fit-badge fit-${fit.cls}">${fit.label}</span>`:''}</div>
                   <div style="font-size:11px;color:var(--txt-dim)">${m?.name} · ${m?.range?.toLocaleString()} km · ${m?.paxCapacity} PAX${!ok?' · <span style="color:var(--red)">Autonomie insuffisante</span>':''}</div>
                 </div>
               </label>`;
@@ -841,6 +921,7 @@ const UI = {
         <tr><td>Marketing</td><td class="text-red">-$${f.costs.marketing.toLocaleString()}</td></tr>
         <tr><td><strong>Résultat net</strong></td><td class="${totalRev-totalCost>=0?'text-green':'text-red'}"><strong>${totalRev-totalCost>=0?'+':''} $${(totalRev-totalCost).toLocaleString()}</strong></td></tr>
       </table>
+      ${this.buildFinancingSection()}
       <div class="section-title">Historique récent</div>
       <div style="max-height:200px;overflow-y:auto">
         ${GS.finances.history.slice().reverse().slice(0,20).map(h=>`
@@ -851,6 +932,104 @@ const UI = {
         `).join('')}
       </div>
     `;
+    this.bindFinancingButtons(container);
+  },
+
+  buildFinancingSection() {
+    if (typeof Finance === 'undefined') return '';
+    const loans = GS.finances.loans || [];
+    const debt = Finance.totalDebt();
+    const nw = Finance.netWorth();
+    const fv = Finance.fleetValue();
+    const maxBorrow = Finance.maxBorrowable();
+    const fmt = n => '$' + Math.round(n).toLocaleString();
+    return `
+      <div class="section-title">💳 Financement</div>
+      <div class="fin-summary">
+        <div class="fin-stat"><div class="fin-stat-lbl">Valeur nette</div><div class="fin-stat-val ${nw<0?'neg':'pos'}">${fmt(nw)}</div></div>
+        <div class="fin-stat"><div class="fin-stat-lbl">Valeur flotte</div><div class="fin-stat-val">${fmt(fv)}</div></div>
+        <div class="fin-stat"><div class="fin-stat-lbl">Dette totale</div><div class="fin-stat-val ${debt>0?'neg':''}">${fmt(debt)}</div></div>
+        <div class="fin-stat"><div class="fin-stat-lbl">Capacité d'emprunt</div><div class="fin-stat-val">${fmt(maxBorrow)}</div></div>
+      </div>
+      ${loans.length ? `<div class="fin-loans">${loans.map(l => {
+        const paidPct = Math.round((1 - l.remaining / l.principal) * 100);
+        return `<div class="fin-loan">
+          <div class="fin-loan-top">
+            <span class="fin-loan-name">${l.product}</span>
+            <span class="fin-loan-rate">${(l.annualRate*100).toFixed(1)}%/an · ${l.termMonths} mois</span>
+          </div>
+          <div class="fin-loan-bar"><div class="fin-loan-bar-fill" style="width:${paidPct}%"></div></div>
+          <div class="fin-loan-bot">
+            <span>Restant : <strong>${fmt(l.remaining)}</strong></span>
+            <span>Échéance : ${fmt(l.monthlyPayment)}/mois</span>
+            <button class="fin-repay-btn" data-repay="${l.id}">Solder</button>
+          </div>
+        </div>`;
+      }).join('')}</div>` : `<div class="fin-noloan">Aucun prêt en cours. Empruntez pour accélérer votre expansion.</div>`}
+      <button class="btn-primary w100" id="btn-take-loan" style="margin-top:10px">💰 Contracter un prêt</button>
+    `;
+  },
+
+  bindFinancingButtons(container) {
+    if (typeof Finance === 'undefined') return;
+    container.querySelector('#btn-take-loan')?.addEventListener('click', () => this.showLoanModal());
+    container.querySelectorAll('[data-repay]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const result = Finance.repayLoan(parseInt(btn.dataset.repay));
+        if (result.error) { this.notify(result.error, 'error'); return; }
+        this.notify('Prêt soldé par anticipation.', 'success');
+        this.refreshPanel();
+        this.updateHeader();
+      });
+    });
+  },
+
+  showLoanModal() {
+    const offers = Finance.getOffers();
+    const maxBorrow = Finance.maxBorrowable();
+    let selected = offers[1] || offers[0];
+    let amount = Math.min(selected.max, Math.round(maxBorrow / 2 / 100000) * 100000) || 1000000;
+    const fmt = n => '$' + Math.round(n).toLocaleString();
+    const render = () => {
+      const pay = Finance.monthlyPayment(amount, selected.annualRate, selected.termMonths);
+      const totalRepay = pay * selected.termMonths;
+      document.getElementById('modal-body').innerHTML = `
+        <div class="loan-offers">
+          ${offers.map(o => `<button class="loan-offer ${o.id===selected.id?'active':''}" data-offer="${o.id}">
+            <div class="loan-offer-name">${o.name}</div>
+            <div class="loan-offer-meta">${(o.annualRate*100).toFixed(1)}%/an · ${o.termMonths} mois</div>
+            <div class="loan-offer-max">Max ${fmt(o.max)}</div>
+          </button>`).join('')}
+        </div>
+        <div class="fg" style="margin-top:14px">
+          <label>Montant emprunté : <strong style="color:var(--cyan)">${fmt(amount)}</strong></label>
+          <input type="range" id="loan-amount" min="500000" max="${Math.max(500000, Math.min(selected.max, maxBorrow))}" step="100000" value="${Math.min(amount, selected.max, maxBorrow)}" style="width:100%;accent-color:var(--cyan)">
+        </div>
+        <div class="card-grid" style="margin-top:8px">
+          <div class="kpi-card"><div class="kpi-label">Mensualité</div><div class="kpi-value">${fmt(pay)}</div></div>
+          <div class="kpi-card"><div class="kpi-label">Coût total</div><div class="kpi-value">${fmt(totalRepay)}</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--txt-dim);margin-top:8px">Capacité d'emprunt restante : ${fmt(maxBorrow)}</div>
+      `;
+      document.querySelectorAll('.loan-offer').forEach(b => b.addEventListener('click', () => {
+        selected = offers.find(o => o.id === b.dataset.offer);
+        amount = Math.min(amount, selected.max, maxBorrow);
+        render();
+      }));
+      document.getElementById('loan-amount')?.addEventListener('input', e => { amount = parseInt(e.target.value); render(); });
+    };
+    this.showModal('💰 Contracter un prêt', '<div id="loan-modal-inner"></div>', [
+      { label: 'Confirmer le prêt', cls: 'btn-primary', action: () => {
+        const result = Finance.takeLoan(selected.id, amount);
+        if (result.error) { this.notify(result.error, 'error'); return; }
+        this.notify(`Prêt de ${fmt(amount)} accordé !`, 'success');
+        this.closeModal();
+        this.refreshPanel();
+        this.updateHeader();
+      }},
+      { label: 'Annuler', cls: 'btn-ghost', action: () => this.closeModal() },
+    ]);
+    render();
   },
 
   renderCrew(container) {
@@ -987,13 +1166,29 @@ const UI = {
     const totalRev = GS.getTotalRevenue();
     const ai = GS.ai;
     const inAir = GS.getFleetInAir().length;
+    const prog = typeof Progression !== 'undefined' ? Progression.getProgress() : null;
+    const nw = typeof Finance !== 'undefined' ? Finance.netWorth() : balance;
+    const debt = typeof Finance !== 'undefined' ? Finance.totalDebt() : 0;
     body.innerHTML = `
+      ${prog ? `
+      <div class="prog-hero">
+        <div class="prog-hero-top">
+          <div class="prog-level-badge">${prog.level}</div>
+          <div class="prog-hero-info">
+            <div class="prog-title">${prog.title}</div>
+            <div class="prog-sub">${prog.isMax ? 'Niveau maximum atteint !' : `${prog.intoLevel.toLocaleString()} / ${prog.neededForNext.toLocaleString()} XP vers niveau ${prog.level+1}`}</div>
+          </div>
+          <div class="prog-rep">⭐ ${Math.round(rep)}</div>
+        </div>
+        <div class="prog-xp-bar"><div class="prog-xp-fill" style="width:${Math.round(prog.progress*100)}%"></div></div>
+      </div>` : ''}
+
       <div class="section-title">Vue d'Ensemble</div>
       <div class="dashboard-grid">
         <div class="kpi-card"><div class="kpi-label">Capital</div><div class="kpi-value ${balance<0?'negative':''}">${GS.getBalanceFormatted()}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valeur nette</div><div class="kpi-value ${nw<0?'negative':'positive'}">${nw>=1e9?'$'+(nw/1e9).toFixed(2)+'B':nw>=1e6?'$'+(nw/1e6).toFixed(1)+'M':'$'+Math.round(nw).toLocaleString()}</div>${debt>0?`<div class="kpi-sub">Dette ${debt>=1e6?'$'+(debt/1e6).toFixed(1)+'M':'$'+Math.round(debt).toLocaleString()}</div>`:''}</div>
         <div class="kpi-card"><div class="kpi-label">Taux remplissage</div><div class="kpi-value ${lf>75?'positive':lf>50?'':'negative'}">${lf}%</div></div>
         <div class="kpi-card"><div class="kpi-label">Flotte en vol</div><div class="kpi-value ${inAir>0?'positive':''}">${inAir} / ${GS.fleet.length}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Revenus ce mois</div><div class="kpi-value positive">+$${totalRev.toLocaleString()}</div></div>
       </div>
       ${GS.routes.length === 0 ? `
         <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">
@@ -1001,20 +1196,11 @@ const UI = {
           <div style="font-size:12px;color:var(--txt-dim);line-height:1.8">
             1. <strong style="color:#fff">Flotte → Marché</strong> : Achetez un appareil<br>
             2. <strong style="color:#fff">Routes → Créer</strong> : Ouvrez votre première ligne<br>
-            3. Regardez votre avion décoller sur la carte !<br>
-            <span style="color:var(--txt-muted)">💡 Admin → ajoutez des fonds pour accélérer le test</span>
+            3. Regardez votre avion décoller sur la carte !
           </div>
         </div>` : ''}
 
-      <div class="section-title">Réputation</div>
-      <div class="rep-display" style="margin-bottom:12px">
-        <div class="rep-stars">${'★'.repeat(GS.company?.level||1)}${'☆'.repeat(5-(GS.company?.level||1))}</div>
-        <div class="rep-num">${Math.round(rep)}</div>
-        <div style="font-size:12px;color:var(--txt-dim);margin-left:8px">/ 100 · Niveau ${GS.company?.level||1}</div>
-      </div>
-      <div class="progress-bar" style="margin-bottom:16px">
-        <div class="progress-fill fill-gold" style="width:${rep}%"></div>
-      </div>
+      ${typeof Progression !== 'undefined' ? this.buildAchievementsBlock() : ''}
 
       <div class="section-title">Routes par Rentabilité</div>
       ${GS.routes.length ? `<table class="data-table">
@@ -1035,6 +1221,24 @@ const UI = {
           <div class="ai-comp-row"><span class="metric">Total vols</span><span class="player-val">${GS.routes.reduce((s,r)=>s+(r.totalFlights||0),0)}</span><span class="ai-val">${ai.totalFlights||0}</span></div>
         </div>` : ''}
     `;
+  },
+
+  buildAchievementsBlock() {
+    const list = Progression.ACHIEVEMENTS;
+    const unlocked = list.filter(a => Progression.isAchievementUnlocked(a.id)).length;
+    return `
+      <div class="section-title">🏆 Succès (${unlocked}/${list.length})</div>
+      <div class="ach-grid">
+        ${list.map(a => {
+          const got = Progression.isAchievementUnlocked(a.id);
+          return `<div class="ach-cell ${got?'got':'locked'}" title="${a.desc}">
+            <div class="ach-ico">${got ? a.icon : '🔒'}</div>
+            <div class="ach-name">${a.name}</div>
+            <div class="ach-desc">${a.desc}</div>
+            ${got ? '<div class="ach-check">✓</div>' : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
   },
 
   /* ===== ADMIN PANEL ===== */

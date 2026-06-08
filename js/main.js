@@ -8,6 +8,7 @@
   let renderLoopId = null;
   let monthTickCounter = 0;
   let lastDayTick = 0;
+  let lastLowBalanceWarn = -1e9;
 
   /* ===== STARTER CONTENT FOR NEW GAME ===== */
   function makeStarterAircraft(modelId, num) {
@@ -256,6 +257,8 @@
     if (monthTickCounter >= 43200) {
       Economy.tickMonthlyCharges();
       Economy.tickFuelPrice();
+      if (typeof Finance !== 'undefined') Finance.tickMonthly();
+      if (typeof Progression !== 'undefined') Progression.checkAchievements();
       monthTickCounter = 0;
     }
     if (GS._tickAccum - lastDayTick >= 1440) {
@@ -266,6 +269,16 @@
       }
       Economy.tickEvents();
       lastDayTick = GS._tickAccum;
+
+      // Helpful guidance when the player is in the red
+      if (GS.finances.balance < 0 && (GS._tickAccum - lastLowBalanceWarn) > 20160) {
+        lastLowBalanceWarn = GS._tickAccum;
+        const losing = GS.routes.filter(r => Economy.calcRouteProfit(r) < 0).length;
+        const msg = losing > 0
+          ? `💸 Capital négatif ! ${losing} route(s) perdent de l'argent — ouvrez-les pour mettre un appareil plus petit, ou supprimez-les. Vous pouvez aussi emprunter (Compagnie → Finances).`
+          : `💸 Capital négatif ! Ouvrez plus de routes rentables ou contractez un prêt (Compagnie → Finances) pour vous refinancer.`;
+        UI.notify(msg, 'warning', 8000);
+      }
     }
     UI.updateHeader();
   }

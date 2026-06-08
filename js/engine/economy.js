@@ -1,10 +1,11 @@
 /* ===== ECONOMY ENGINE — Hakvision Aircraft ===== */
 const Economy = {
-  BASE_TICKET_ECONOMY: 0.085,
-  BASE_TICKET_PREMECO: 0.145,
-  BASE_TICKET_BUSINESS: 0.32,
-  BASE_TICKET_FIRST: 0.60,
-  CARGO_RATE: 2.8,
+  // Ticket rates ($/km) — tuned so well-sized routes are clearly profitable
+  BASE_TICKET_ECONOMY: 0.115,
+  BASE_TICKET_PREMECO: 0.195,
+  BASE_TICKET_BUSINESS: 0.44,
+  BASE_TICKET_FIRST: 0.82,
+  CARGO_RATE: 3.4,
 
   calcTicketPrice(distanceKm, cabinClass, qualityIndex = 1.0) {
     const base = { economy: this.BASE_TICKET_ECONOMY, premeco: this.BASE_TICKET_PREMECO, business: this.BASE_TICKET_BUSINESS, first: this.BASE_TICKET_FIRST };
@@ -34,8 +35,10 @@ const Economy = {
   calcLandingFee(airportIata, model) {
     const airport = getAirport(airportIata);
     if (!airport || !model) return 0;
-    const weight = model.paxCapacity * 0.1 + (model.cargoCapacity || 0);
-    let fee = airport.landingFee;
+    // Landing fees scale with aircraft size (MTOW proxy). The published fee is
+    // calibrated for a ~180-seat narrowbody; smaller aircraft pay much less.
+    const sizeFactor = Math.max(0.22, Math.min(2.6, (model.paxCapacity + (model.cargoCapacity || 0) * 4) / 180));
+    let fee = airport.landingFee * sizeFactor;
     if (GS.alliances.includes('skyworld')) fee *= 0.85;
     if (GS.alliances.includes('afrijet') && airport.continent === 'AF') fee *= 0.80;
     return Math.round(fee);
@@ -55,7 +58,7 @@ const Economy = {
     if (!model) return 0;
     const pilotsPerFlight = model.category === 'widebody' ? 2 : model.range > 8000 ? 3 : 2;
     const cabinCrew = Math.max(2, Math.ceil(model.paxCapacity / 50));
-    const crewHourlyRate = 85;
+    const crewHourlyRate = 60;
     return Math.round((pilotsPerFlight + cabinCrew) * crewHourlyRate * durationHours);
   },
 
@@ -145,7 +148,7 @@ const Economy = {
     });
     const hubAirport = getAirport(GS.company.hub);
     if (hubAirport) {
-      const hubFee = hubAirport.landingFee * 5;
+      const hubFee = hubAirport.landingFee * 3;
       GS.addToBalance(-hubFee, 'fees', 'Frais de hub mensuel');
     }
     GS.finances.lastMonthPL = GS.getMonthlyPL();

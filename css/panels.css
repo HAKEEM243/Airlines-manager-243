@@ -719,3 +719,136 @@
   .itin-profit-lbl { margin-top: 0; margin-left: 2px; }
   .btn-depart    { width: auto; padding: 8px 16px; }
 }
+
+/* ===================================================
+   TYCOON DEPTH — Progression, Achievements, Finance, Maintenance
+   =================================================== */
+
+/* ----- Progression hero (dashboard) ----- */
+.prog-hero {
+  background: linear-gradient(135deg, rgba(0,95,163,0.25), rgba(168,85,247,0.18));
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.prog-hero-top { display: flex; align-items: center; gap: 12px; }
+.prog-level-badge {
+  width: 46px; height: 46px; flex-shrink: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00d4ff, #0066cc);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-hdr); font-size: 22px; font-weight: 900; color: #fff;
+  box-shadow: 0 4px 14px rgba(0,136,204,0.4);
+}
+.prog-hero-info { flex: 1; min-width: 0; }
+.prog-title { font-family: var(--font-hdr); font-size: 15px; font-weight: 700; color: #fff; }
+.prog-sub { font-size: 11px; color: var(--txt-dim); margin-top: 2px; }
+.prog-rep {
+  font-size: 13px; font-weight: 700; color: var(--gold);
+  background: rgba(255,215,0,0.1); border: 1px solid rgba(255,215,0,0.25);
+  padding: 5px 10px; border-radius: 20px; flex-shrink: 0;
+}
+.prog-xp-bar { height: 8px; background: rgba(0,0,0,0.35); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+.prog-xp-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #a855f7); border-radius: 4px; transition: width .5s ease; }
+
+/* ----- Achievements grid ----- */
+.ach-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.ach-cell {
+  position: relative;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 8px; text-align: center;
+  transition: border-color .2s, transform .2s;
+}
+.ach-cell.got { border-color: rgba(0,232,122,0.4); background: rgba(0,232,122,0.06); }
+.ach-cell.locked { opacity: 0.55; }
+.ach-ico { font-size: 22px; margin-bottom: 4px; }
+.ach-name { font-size: 10px; font-weight: 700; color: var(--txt); line-height: 1.2; }
+.ach-desc { font-size: 8.5px; color: var(--txt-muted); margin-top: 2px; line-height: 1.25; }
+.ach-check { position: absolute; top: 5px; right: 6px; color: #00e87a; font-size: 11px; font-weight: 900; }
+
+/* ----- Market lock overlay ----- */
+.mac-v2-locked .mac-v2-illustration { position: relative; }
+.mac-v2-lock-overlay {
+  position: absolute; inset: 0;
+  background: rgba(4,10,20,0.78); backdrop-filter: blur(2px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+}
+.mac-v2-lock-ico { font-size: 30px; opacity: 0.9; }
+.mac-v2-lock-txt { font-size: 12px; font-weight: 700; color: var(--gold); font-family: var(--font-hdr); letter-spacing: .5px; }
+
+/* ----- Right-sizing fit badge ----- */
+.fit-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: middle; }
+.fit-good { background: rgba(0,232,122,0.15); color: #00e87a; }
+.fit-mid  { background: rgba(255,215,0,0.15); color: var(--gold); }
+.fit-bad  { background: rgba(255,71,87,0.15); color: var(--red); }
+
+/* ----- Maintenance block (aircraft detail) ----- */
+.mnt-block { background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 12px 0; }
+.mnt-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.mnt-title { font-size: 12px; font-weight: 700; color: var(--txt); }
+.mnt-badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 12px; }
+.mnt-badge.mnt-ok   { background: rgba(0,232,122,0.15); color: #00e87a; }
+.mnt-badge.mnt-soon { background: rgba(255,215,0,0.15); color: var(--gold); }
+.mnt-badge.mnt-due  { background: rgba(255,71,87,0.18); color: var(--red); }
+.mnt-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.mnt-bar-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+.mnt-bar-fill.mnt-ok { background: #00e87a; }
+.mnt-bar-fill.mnt-soon { background: var(--gold); }
+.mnt-bar-fill.mnt-due { background: var(--red); }
+.mnt-info { font-size: 11px; color: var(--txt-dim); margin-top: 6px; }
+.mnt-warn { font-size: 11px; color: var(--orange); margin-top: 6px; }
+.mnt-actions { display: flex; gap: 6px; margin-top: 10px; }
+.mnt-btn {
+  flex: 1; background: rgba(0,212,255,0.08); color: var(--cyan);
+  border: 1px solid rgba(0,212,255,0.2); border-radius: 8px;
+  padding: 8px 4px; font-size: 10.5px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: all .2s;
+}
+.mnt-btn:hover { background: rgba(0,212,255,0.16); }
+.mnt-btn.urgent { background: rgba(255,71,87,0.12); color: var(--red); border-color: rgba(255,71,87,0.3); }
+.mnt-btn.urgent:hover { background: rgba(255,71,87,0.22); }
+
+/* ----- Financing section (finances panel) ----- */
+.fin-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.fin-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.fin-stat-lbl { font-size: 10px; color: var(--txt-muted); text-transform: uppercase; letter-spacing: .5px; }
+.fin-stat-val { font-size: 16px; font-weight: 700; font-family: var(--font-hdr); color: var(--txt); margin-top: 3px; }
+.fin-stat-val.pos { color: #00e87a; }
+.fin-stat-val.neg { color: var(--red); }
+.fin-noloan { font-size: 12px; color: var(--txt-dim); text-align: center; padding: 10px; background: var(--bg-card); border: 1px dashed var(--border); border-radius: 10px; }
+.fin-loans { display: flex; flex-direction: column; gap: 8px; }
+.fin-loan { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.fin-loan-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.fin-loan-name { font-size: 13px; font-weight: 700; color: #fff; }
+.fin-loan-rate { font-size: 10px; color: var(--txt-dim); }
+.fin-loan-bar { height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+.fin-loan-bar-fill { height: 100%; background: linear-gradient(90deg,#00d4ff,#00e87a); border-radius: 3px; }
+.fin-loan-bot { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--txt-dim); margin-top: 8px; flex-wrap: wrap; }
+.fin-repay-btn { background: rgba(0,232,122,0.1); color: #00e87a; border: 1px solid rgba(0,232,122,0.3); border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.fin-repay-btn:hover { background: rgba(0,232,122,0.2); }
+
+/* ----- Loan modal ----- */
+.loan-offers { display: flex; gap: 8px; }
+.loan-offer { flex: 1; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px; text-align: center; cursor: pointer; transition: all .2s; }
+.loan-offer.active { border-color: var(--cyan); background: rgba(0,212,255,0.08); }
+.loan-offer-name { font-size: 11px; font-weight: 700; color: var(--txt); line-height: 1.2; }
+.loan-offer-meta { font-size: 9.5px; color: var(--txt-dim); margin-top: 4px; }
+.loan-offer-max { font-size: 9.5px; color: var(--gold); margin-top: 3px; }
+
+/* ----- Route detail: auto-return toggle + loss warning ----- */
+.route-toggle-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin: 12px 0;
+}
+.rt-toggle-name { font-size: 13px; font-weight: 700; color: #fff; }
+.rt-toggle-desc { font-size: 11px; color: var(--txt-dim); margin-top: 3px; max-width: 240px; }
+.route-loss-warn {
+  background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3);
+  border-radius: 10px; padding: 12px; font-size: 12px; color: var(--red); line-height: 1.5; margin-top: 6px;
+}
+
+@media (max-width: 480px) {
+  .ach-grid { grid-template-columns: repeat(2, 1fr); }
+}

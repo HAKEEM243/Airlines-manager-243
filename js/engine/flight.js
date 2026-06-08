@@ -179,36 +179,51 @@ const FlightEngine = {
     const duration = aircraft.durationHours || 0;
     aircraft.ageHours = (aircraft.ageHours || 0) + duration;
     aircraft.condition = Math.max(10, (aircraft.condition || 100) - duration * 0.05);
+
+    // Progression: award XP for completing the flight
+    if (typeof Progression !== 'undefined') {
+      const lf = route ? (route.loadFactor || 0.8) : 0.8;
+      const xp = Math.round(8 + lf * 10 + Math.max(0, (profit || 0)) / 50000);
+      Progression.addXP(xp, 'flight');
+      Progression.checkAchievements();
+    }
+
+    // Maintenance: roll for an incident if checks are overdue
+    let incident = null;
+    if (typeof Maintenance !== 'undefined') {
+      incident = Maintenance.rollIncident(aircraft);
+    }
+
     const profitStr = profit != null ? ` · ${profit > 0 ? '+' : ''}$${Math.abs(profit || 0).toLocaleString()}` : '';
     UI.notify(
       `✈ Vol ${aircraft.flightId} arrivé — ${aircraft.origin} → ${aircraft.destination}${profitStr}`,
       profit > 0 ? 'success' : 'warning',
       4500
     );
+    if (incident) {
+      UI.notify(`🔧 Incident technique sur ${aircraft.name} — maintenance en retard ! Coût $${incident.cost.toLocaleString()}`, 'error', 6000);
+    }
+    // Park the aircraft at the airport it just reached
+    aircraft.status = 'ground';
+    aircraft.locationIata = aircraft.destination;
+    aircraft.currentSpeed = 0;
+    aircraft.currentAlt = 0;
+
     if (route && route.status === 'active') {
-      setTimeout(() => {
-        if (route.status === 'active' && aircraft.status !== 'maintenance') {
-          const origin = aircraft.destination;
-          const destination = aircraft.origin;
-          const swapped = { ...aircraft, origin, destination, pathPoints: null };
-          aircraft.origin = origin;
-          aircraft.destination = destination;
-          aircraft.progress = 0;
-          aircraft.departureTime = new Date(GS.gameDate);
-          aircraft.arrivalTime = new Date(GS.gameDate.getTime() + (aircraft.durationHours || 4) * 3600 * 1000);
-          aircraft.phase = 'taxiing';
-          aircraft.status = 'flying';
-          const oAp = getAirport(origin);
-          const dAp = getAirport(destination);
-          if (oAp && dAp) {
-            aircraft.pathPoints = geodesicPoints(oAp, dAp, 100);
-            aircraft.heading = RouteEngine.calcBearing(oAp.lat, oAp.lon, dAp.lat, dAp.lon);
+      if (route.autoReturn !== false) {
+        // Continuous service: automatically dispatch the next leg back
+        setTimeout(() => {
+          if (route.status === 'active' && aircraft.status === 'ground') {
+            RouteEngine.dispatchFlight(route, aircraft);
           }
-          aircraft.flightId = GSHelpers.createFlightId(origin, destination);
-        }
-      }, 100);
+        }, 100);
+      } else {
+        // Manual mode: wait for the player to dispatch the return flight
+        const back = aircraft.locationIata === route.destination ? route.origin : route.destination;
+        UI.notify(`🛬 ${aircraft.name} au sol à ${aircraft.destination} — prêt pour ${back}. Lancez le départ depuis Routes.`, 'info', 6000);
+        if (UI.currentTab === 'routes') UI.refreshPanel();
+      }
     } else {
-      aircraft.status = 'ground';
       aircraft.routeId = null;
     }
   },

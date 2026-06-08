@@ -337,3 +337,385 @@
 
 /* ===== ANIMATIONS FOR PLANES ON MAP ===== */
 @keyframes fly-pulse { 0%,100%{r:5} 50%{r:7} }
+
+/* ===================================================
+   AM2026-STYLE AIRCRAFT MARKET CARDS (mac-v2)
+   =================================================== */
+.mac-v2 {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
+}
+.mac-v2:hover {
+  border-color: rgba(0,212,255,0.5);
+  box-shadow: 0 4px 24px rgba(0,212,255,0.1);
+  transform: translateY(-1px);
+}
+
+/* Aircraft illustration area */
+.mac-v2-illustration {
+  width: 100%;
+  height: 130px;
+  background: #08111f;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mac-v2-illustration svg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Card body */
+.mac-v2-body { padding: 14px 16px 16px; }
+
+.mac-v2-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.mac-v2-name {
+  font-weight: 800;
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: 0.2px;
+  font-family: var(--font-hdr);
+}
+.mac-v2-maker {
+  font-size: 11px;
+  color: var(--txt-dim);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mac-v2-cat {
+  background: rgba(0,212,255,0.12);
+  color: var(--cyan);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  font-family: var(--font-hdr);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+.mac-v2-price-block { text-align: right; flex-shrink: 0; }
+.mac-v2-price {
+  font-family: var(--font-hdr);
+  font-size: 17px;
+  color: var(--gold);
+  font-weight: 700;
+}
+.mac-v2-lease-price {
+  font-size: 10px;
+  color: var(--txt-dim);
+  margin-top: 2px;
+}
+
+/* Specs row */
+.mac-v2-specs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  background: rgba(0,0,0,0.25);
+  border-radius: 10px;
+  padding: 8px 6px;
+}
+.mac-v2-spec {
+  flex: 1;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.mac-v2-spec:last-child { border-right: none; }
+.mac-v2-spec-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--txt);
+  font-family: var(--font-hdr);
+}
+.mac-v2-spec-lbl {
+  font-size: 9px;
+  color: var(--txt-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-top: 2px;
+}
+
+.mac-v2-desc {
+  font-size: 11px;
+  color: var(--txt-dim);
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+/* Action buttons */
+.mac-v2-actions { display: flex; gap: 8px; }
+
+.mac-v2-btn-buy {
+  flex: 2;
+  background: linear-gradient(135deg, #005fa3, #0088cc);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all .2s;
+  font-family: var(--font-body);
+}
+.mac-v2-btn-buy:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0077cc, #00aaff);
+  box-shadow: 0 4px 14px rgba(0,136,204,0.4);
+  transform: translateY(-1px);
+}
+.mac-v2-btn-buy.mac-v2-btn-disabled,
+.mac-v2-btn-buy:disabled {
+  background: rgba(255,255,255,0.06);
+  color: var(--txt-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.mac-v2-btn-lease {
+  flex: 1;
+  background: rgba(0,212,255,0.08);
+  color: var(--cyan);
+  border: 1px solid rgba(0,212,255,0.25);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all .2s;
+  font-family: var(--font-body);
+}
+.mac-v2-btn-lease:hover {
+  background: rgba(0,212,255,0.15);
+  border-color: rgba(0,212,255,0.45);
+}
+
+/* ===================================================
+   AM2026-STYLE ROUTE CARDS (itin-v2 — Itinéraires)
+   =================================================== */
+.itin-v2 {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.itin-v2:hover {
+  border-color: rgba(0,212,255,0.35);
+  box-shadow: 0 2px 16px rgba(0,212,255,0.07);
+}
+
+/* Left column: route code + airports */
+.itin-v2-left {
+  flex: 1.2;
+  padding: 12px 14px;
+  border-right: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+}
+.itin-v2-code {
+  font-family: var(--font-hdr);
+  font-size: 9px;
+  color: var(--txt-muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.itin-v2-airports {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.itin-iata {
+  font-family: var(--font-hdr);
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+.itin-arrow {
+  font-size: 12px;
+  color: var(--txt-muted);
+}
+.itin-v2-cities {
+  font-size: 10px;
+  color: var(--txt-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.itin-v2-aircraft {
+  font-size: 10px;
+  color: var(--txt-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Middle column: stats + cabin */
+.itin-v2-mid {
+  flex: 1.5;
+  padding: 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  border-right: 1px solid rgba(255,255,255,0.05);
+}
+.itin-v2-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.ivs-val {
+  font-family: var(--font-hdr);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--txt);
+}
+.ivs-unit {
+  font-size: 9px;
+  color: var(--txt-muted);
+}
+.ivs-lbl {
+  font-size: 9px;
+  color: var(--txt-muted);
+  margin-left: 4px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.itin-v2-cabin {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+.cab-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: var(--font-hdr);
+  letter-spacing: .3px;
+}
+.cab-eco   { background: rgba(0,212,255,0.12); color: var(--cyan); }
+.cab-biz   { background: rgba(255,215,0,0.12); color: var(--gold); }
+.cab-first { background: rgba(168,85,247,0.12); color: var(--purple); }
+.itin-v2-flights {
+  font-size: 9px;
+  color: var(--txt-muted);
+  margin-top: 2px;
+}
+
+/* Right column: profit + Départ button */
+.itin-v2-right {
+  flex: 0 0 90px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.itin-profit {
+  font-family: var(--font-hdr);
+  font-size: 15px;
+  font-weight: 700;
+}
+.itin-profit.pos { color: #00e87a; }
+.itin-profit.neg { color: var(--red); }
+.itin-profit-lbl {
+  font-size: 9px;
+  color: var(--txt-muted);
+  margin-top: -4px;
+  letter-spacing: .3px;
+}
+
+/* Green Départ button */
+.btn-depart {
+  width: 100%;
+  background: linear-gradient(135deg, #00a855, #00d469);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all .2s;
+  margin-top: 2px;
+  letter-spacing: .3px;
+}
+.btn-depart:hover {
+  background: linear-gradient(135deg, #00c466, #00ee7a);
+  box-shadow: 0 3px 12px rgba(0,200,100,0.4);
+  transform: translateY(-1px);
+}
+.btn-depart:active {
+  transform: scale(0.96);
+}
+
+/* Flying status indicator (replaces Départ button) */
+.itin-status-flying {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: var(--green);
+  font-weight: 600;
+}
+.itin-flying-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: blink 2s infinite;
+  flex-shrink: 0;
+}
+
+/* ===== RESPONSIVE adjustments for new cards ===== */
+@media (max-width: 480px) {
+  .mac-v2-illustration { height: 110px; }
+  .mac-v2-name { font-size: 14px; }
+  .mac-v2-price { font-size: 15px; }
+  .mac-v2-specs { gap: 2px; padding: 6px 4px; }
+  .mac-v2-spec-val { font-size: 11px; }
+
+  .itin-v2 { flex-direction: column; }
+  .itin-v2-left  { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 10px 12px; }
+  .itin-v2-mid   { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 12px; }
+  .itin-v2-right { flex: none; flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 12px; }
+  .itin-profit   { font-size: 14px; }
+  .itin-profit-lbl { margin-top: 0; margin-left: 2px; }
+  .btn-depart    { width: auto; padding: 8px 16px; }
+}

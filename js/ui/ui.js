@@ -220,25 +220,53 @@ const UI = {
 
   buildMarketList(models) {
     if (!models.length) return '<div class="empty-state"><div class="es-icon">🔍</div><p>Aucun appareil trouvé.</p></div>';
+    const catLabel = { turboprop:'Turbopropulseur', regional_jet:'Jet Régional', narrowbody:'Court-courrier', widebody:'Long-courrier', cargo:'Cargo', supersonic:'Supersonique' };
+    const canAfford = m => GS.finances.balance >= m.purchasePrice;
     return models.map(m => `
-      <div class="market-aircraft-card">
-        <div class="mac-header">
-          <div>
-            <div class="mac-name">${m.icon} ${m.name}</div>
-            <div class="mac-manufacturer">${m.manufacturer} · <span class="tag tag-category">${m.category}</span></div>
+      <div class="mac-v2" data-macid="${m.id}">
+        <div class="mac-v2-illustration">${typeof getAircraftImage === 'function' ? getAircraftImage(m.category) : ''}</div>
+        <div class="mac-v2-body">
+          <div class="mac-v2-top">
+            <div class="mac-v2-title-block">
+              <div class="mac-v2-name">${m.name}</div>
+              <div class="mac-v2-maker">${m.manufacturer} <span class="mac-v2-cat">${catLabel[m.category] || m.category}</span></div>
+            </div>
+            <div class="mac-v2-price-block">
+              <div class="mac-v2-price">$${(m.purchasePrice/1e6).toFixed(1)}M</div>
+              <div class="mac-v2-lease-price">${Math.round(m.purchasePrice*0.002/1000)}K/mois</div>
+            </div>
           </div>
-          <div class="mac-price">$${(m.purchasePrice/1e6).toFixed(1)}M</div>
-        </div>
-        <div class="mac-specs">
-          <div class="mac-spec"><div class="ms-val">${m.paxCapacity}</div><div class="ms-lbl">PAX</div></div>
-          <div class="mac-spec"><div class="ms-val">${m.range.toLocaleString()}</div><div class="ms-lbl">km</div></div>
-          <div class="mac-spec"><div class="ms-val">${m.cruiseSpeed}</div><div class="ms-lbl">km/h</div></div>
-          <div class="mac-spec"><div class="ms-val">${m.comfortLevel}/10</div><div class="ms-lbl">Confort</div></div>
-        </div>
-        <p style="font-size:11px;color:var(--txt-dim);margin:6px 0 10px">${m.description}</p>
-        <div class="mac-actions">
-          <button class="btn-primary btn-sm" data-buy="${m.id}">✈ Acheter</button>
-          <button class="btn-ghost btn-sm" data-lease="${m.id}">📋 Louer (${Math.round(m.purchasePrice*0.002/100)*100}$/mois)</button>
+          <div class="mac-v2-specs">
+            <div class="mac-v2-spec">
+              <div class="mac-v2-spec-val">${m.paxCapacity}</div>
+              <div class="mac-v2-spec-lbl">PAX</div>
+            </div>
+            <div class="mac-v2-spec">
+              <div class="mac-v2-spec-val">${m.range.toLocaleString()}</div>
+              <div class="mac-v2-spec-lbl">km</div>
+            </div>
+            <div class="mac-v2-spec">
+              <div class="mac-v2-spec-val">${m.cruiseSpeed}</div>
+              <div class="mac-v2-spec-lbl">km/h</div>
+            </div>
+            <div class="mac-v2-spec">
+              <div class="mac-v2-spec-val">${(m.fuelBurnPerHour/1000).toFixed(1)}k</div>
+              <div class="mac-v2-spec-lbl">L/h</div>
+            </div>
+            <div class="mac-v2-spec">
+              <div class="mac-v2-spec-val">${m.comfortLevel}<span style="font-size:10px">/10</span></div>
+              <div class="mac-v2-spec-lbl">Confort</div>
+            </div>
+          </div>
+          <p class="mac-v2-desc">${m.description}</p>
+          <div class="mac-v2-actions">
+            <button class="mac-v2-btn-buy ${canAfford(m)?'':'mac-v2-btn-disabled'}" data-buy="${m.id}" ${canAfford(m)?'':'disabled'}>
+              <span>✈</span> Acheter
+            </button>
+            <button class="mac-v2-btn-lease" data-lease="${m.id}">
+              <span>📋</span> Louer
+            </button>
+          </div>
         </div>
       </div>
     `).join('');
@@ -261,8 +289,8 @@ const UI = {
       this.notify('Fonds insuffisants.', 'error'); return;
     }
     this.showModal(`${lease?'Louer':'Acheter'} — ${model.name}`,`
-      <div style="text-align:center;padding:12px 0">
-        <div style="font-size:48px;margin-bottom:12px">${model.icon}</div>
+      <div style="text-align:center;padding:0 0 12px">
+        <div style="width:100%;height:120px;background:#08111f;border-radius:10px;overflow:hidden;margin-bottom:14px">${typeof getAircraftImage === 'function' ? getAircraftImage(model.category) : ''}</div>
         <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px">${model.name}</div>
         <div style="font-size:13px;color:var(--txt-dim);margin-bottom:20px">${model.manufacturer}</div>
         <div class="card-grid" style="margin-bottom:20px">
@@ -521,10 +549,24 @@ const UI = {
         </div>`}
     `;
     document.getElementById('btn-new-route')?.addEventListener('click', onNew);
-    body.querySelectorAll('.route-card').forEach(card => {
-      card.addEventListener('click', () => {
+    body.querySelectorAll('.itin-v2').forEach(card => {
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('btn-depart') || e.target.closest('.btn-depart')) return;
         const route = GS.getRoute(parseInt(card.dataset.rid));
         if (route) this.showRouteDetail(route);
+      });
+    });
+    body.querySelectorAll('.btn-depart').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const route = GS.getRoute(parseInt(btn.dataset.rid));
+        if (!route) return;
+        const aircraft = GS.fleet.find(a => a.routeId === route.id);
+        if (!aircraft) { this.notify('Aucun appareil assigné à cette route.','error'); return; }
+        if (aircraft.status === 'flying') { this.notify('Cet appareil est déjà en vol.','warning'); return; }
+        RouteEngine.launchFlight(route, aircraft);
+        this.notify(`✈ ${aircraft.name} — départ ${route.origin} → ${route.destination}`, 'success');
+        this.refreshPanel();
       });
     });
   },
@@ -534,22 +576,51 @@ const UI = {
     const d = getAirport(r.destination);
     const profit = Economy.calcRouteProfit(r);
     const aircraft = GS.fleet.find(a => a.routeId === r.id);
-    return `<div class="route-card" data-rid="${r.id}">
-      <div class="rc-header">
-        <div class="rc-route">
-          <span class="iata">${r.origin}</span>
-          <span class="arrow">→</span>
-          <span class="iata">${r.destination}</span>
+    const model = aircraft ? getAircraftModel(aircraft.modelId) : null;
+    const isFlying = aircraft?.status === 'flying';
+    const routeCode = `${GS.company?.iata || 'HA'}-${String(r.id).padStart(3,'0')}`;
+    const lf = Math.round((r.loadFactor||0)*100);
+    const eco = Math.round((r.cabinConfig?.economy||0.8)*100);
+    const biz = Math.round((r.cabinConfig?.business||0.06)*100);
+    const first = Math.round((r.cabinConfig?.first||0.02)*100);
+    return `<div class="itin-v2" data-rid="${r.id}">
+      <div class="itin-v2-left">
+        <div class="itin-v2-code">${routeCode}</div>
+        <div class="itin-v2-airports">
+          <span class="itin-iata">${r.origin}</span>
+          <span class="itin-arrow">→</span>
+          <span class="itin-iata">${r.destination}</span>
         </div>
-        <span class="badge ${profit>0?'badge-green':'badge-red'}">${profit>0?'+':'-'}$${Math.abs(profit).toLocaleString()}</span>
+        <div class="itin-v2-cities">${o?.city||r.origin} → ${d?.city||r.destination}</div>
+        <div class="itin-v2-aircraft">${aircraft ? `${model?.icon||'✈'} ${aircraft.name} · ${model?.name||''}` : '<span class="text-red">Aucun appareil assigné</span>'}</div>
       </div>
-      <div class="rc-stats">
-        <div class="rc-stat"><span>Distance</span><strong>${r.distanceKm?.toLocaleString()} km</strong></div>
-        <div class="rc-stat"><span>Durée</span><strong>${r.durationHours?.toFixed(1)}h</strong></div>
-        <div class="rc-stat"><span>Remplissage</span><strong>${Math.round((r.loadFactor||0)*100)}%</strong></div>
-        <div class="rc-stat"><span>Vols</span><strong>${r.totalFlights||0}</strong></div>
+      <div class="itin-v2-mid">
+        <div class="itin-v2-stat">
+          <div class="ivs-val">${r.distanceKm?.toLocaleString()||'-'}<span class="ivs-unit">km</span></div>
+          <div class="ivs-lbl">Distance</div>
+        </div>
+        <div class="itin-v2-stat">
+          <div class="ivs-val">${lf}<span class="ivs-unit">%</span></div>
+          <div class="ivs-lbl">Remplissage</div>
+        </div>
+        <div class="itin-v2-cabin">
+          <span class="cab-badge cab-eco">Y${eco}%</span>
+          <span class="cab-badge cab-biz">J${biz}%</span>
+          <span class="cab-badge cab-first">F${first}%</span>
+        </div>
+        <div class="itin-v2-flights">${r.totalFlights||0} vols · $${(r.totalRevenue||0).toLocaleString()}</div>
       </div>
-      <div class="rc-aircraft">${aircraft ? `✈ ${aircraft.name}` : '<span style="color:var(--red)">Aucun appareil</span>'} · ${r.waypoints?.length ? r.waypoints.length + ' escale(s)' : 'Direct'}</div>
+      <div class="itin-v2-right">
+        <div class="itin-profit ${profit>=0?'pos':'neg'}">${profit>=0?'+':'-'}$${Math.abs(profit).toLocaleString()}</div>
+        <div class="itin-profit-lbl">/vol</div>
+        ${isFlying
+          ? `<div class="itin-status-flying">
+               <div class="itin-flying-dot"></div>
+               <span>En vol ${Math.round((aircraft.progress||0)*100)}%</span>
+             </div>`
+          : `<button class="btn-depart" data-rid="${r.id}">▶ Départ</button>`
+        }
+      </div>
     </div>`;
   },
 

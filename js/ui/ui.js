@@ -413,6 +413,90 @@ const UI = {
     </svg>`;
   },
 
+  /* ===== QUICK ROUTE FROM MAP (Airline-Manager style) ===== */
+  quickRouteTo(destIata) {
+    if (!GS.company) return;
+    const hub = getAirport(GS.company.hub);
+    const dest = getAirport(destIata);
+    if (!hub || !dest) return;
+    const dist = calcDistance(hub, dest);
+
+    // Find an available aircraft that can fly this distance
+    const available = GS.fleet.filter(a =>
+      (a.status === 'available' || a.status === 'ground')
+    );
+    const flyable = available.filter(a => {
+      const m = getAircraftModel(a.modelId);
+      return m && canFlyRoute(m, dist);
+    });
+
+    const info = RouteEngine.getRouteInfo(GS.company.hub, destIata);
+    const demand = info ? info.demand : 0;
+
+    if (!flyable.length) {
+      const reason = available.length
+        ? `Aucun de vos appareils disponibles n'a l'autonomie pour ${dist.toLocaleString()} km.`
+        : `Vous n'avez aucun appareil disponible.`;
+      this.showModal(`Route ${GS.company.hub} → ${destIata}`, `
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:40px;margin-bottom:10px">🛫</div>
+          <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">${hub.city} → ${dest.city}</div>
+          <div style="font-size:12px;color:var(--txt-dim);margin-bottom:14px">Distance : ${dist.toLocaleString()} km · Demande : ${demand.toLocaleString()} PAX/j</div>
+          <div style="background:rgba(255,107,53,0.1);border:1px solid rgba(255,107,53,0.3);border-radius:var(--radius);padding:12px;font-size:12px;color:var(--orange)">${reason}</div>
+        </div>
+      `, [
+        { label: '✈ Aller au Marché', cls: 'btn-primary', action: () => { this.closeModal(); this.openPanel('fleet'); } },
+        { label: 'Fermer', cls: 'btn-ghost', action: () => this.closeModal() },
+      ]);
+      return;
+    }
+
+    // Pick the best-fit aircraft (smallest range that still works → efficiency)
+    flyable.sort((a, b) => getAircraftModel(a.modelId).range - getAircraftModel(b.modelId).range);
+    const ac = flyable[0];
+    const model = getAircraftModel(ac.modelId);
+
+    // Build a temporary route preview to estimate profit
+    const tmpRoute = {
+      origin: GS.company.hub, destination: destIata,
+      aircraftModelId: ac.modelId,
+      loadFactor: RouteEngine.estimateLoadFactor(dist, demand, model, GS.company.service.level),
+      cabinConfig: { economy: 0.80, premeco: 0.12, business: 0.06, first: 0.02 },
+    };
+    const profit = Economy.calcRouteProfit(tmpRoute);
+
+    this.showModal(`Nouvelle route — ${GS.company.hub} → ${destIata}`, `
+      <div style="text-align:center;padding:6px 0 14px">
+        <div style="font-size:40px;margin-bottom:8px">🛫</div>
+        <div style="font-size:16px;font-weight:700;color:#fff">${hub.city} → ${dest.city}</div>
+        <div style="font-size:12px;color:var(--txt-dim);margin-top:3px">${dest.country}</div>
+      </div>
+      <div class="card-grid" style="margin-bottom:14px">
+        <div class="kpi-card"><div class="kpi-label">Distance</div><div class="kpi-value">${dist.toLocaleString()} km</div></div>
+        <div class="kpi-card"><div class="kpi-label">Demande</div><div class="kpi-value">${demand.toLocaleString()}</div><div class="kpi-sub">PAX/jour</div></div>
+        <div class="kpi-card"><div class="kpi-label">Remplissage est.</div><div class="kpi-value">${Math.round(tmpRoute.loadFactor*100)}%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Profit/vol</div><div class="kpi-value ${profit>=0?'positive':'negative'}">${profit>=0?'+':''}$${profit.toLocaleString()}</div></div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">${model.icon}</span>
+        <div>
+          <div style="font-weight:700;color:#fff;font-size:13px">${ac.name}</div>
+          <div style="font-size:11px;color:var(--txt-dim)">${model.name} · ${model.paxCapacity} PAX · ${model.range.toLocaleString()} km</div>
+        </div>
+      </div>
+    `, [
+      { label: '✈ Ouvrir la ligne', cls: 'btn-primary', action: () => {
+        const result = RouteEngine.createRoute(GS.company.hub, destIata, ac.id, { cabinConfig: tmpRoute.cabinConfig });
+        if (result.error) { this.notify(result.error, 'error'); return; }
+        MapEngine.addRoutePolyline(result.route);
+        this.closeModal();
+        this.notify(`Route ${GS.company.hub} → ${destIata} ouverte ! ✈`, 'success');
+        if (this.currentTab) this.refreshPanel();
+      }},
+      { label: 'Annuler', cls: 'btn-ghost', action: () => this.closeModal() },
+    ]);
+  },
+
   /* ===== ROUTES PANEL ===== */
   renderRoutes(body) {
     let view = 'list';

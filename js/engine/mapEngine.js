@@ -21,14 +21,22 @@ const MapEngine = {
 
   init() {
     this.map = L.map('map', {
-      center: [15, 20],
-      zoom: 3,
+      center: [10, 20],
+      zoom: 4,
       zoomControl: true,
       attributionControl: true,
       minZoom: 2,
       maxZoom: 12,
       worldCopyJump: true,
+      dragging: true,
+      tap: false,            // iOS Safari: let native touch drive Leaflet handlers
+      touchZoom: true,
+      doubleClickZoom: true,
+      scrollWheelZoom: true,
+      inertia: true,
     });
+    // Place zoom control bottom-right so it's clear of the header
+    this.map.zoomControl.setPosition('bottomright');
 
     this.layers.satellite = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -77,9 +85,18 @@ const MapEngine = {
         iconAnchor: [size, size],
       });
       const marker = L.marker([ap.lat, ap.lon], { icon, zIndexOffset: 100 });
-      marker.bindPopup(this.buildAirportPopup(ap), { className: 'ap-popup' });
+      marker.bindPopup(this.buildAirportPopup(ap), { className: 'ap-popup', minWidth: 220 });
       marker.on('click', e => {
         e.originalEvent.stopPropagation();
+      });
+      marker.on('popupopen', () => {
+        const btn = document.querySelector(`.popup-route-btn[data-dest="${ap.iata}"]`);
+        if (btn && !btn.classList.contains('is-hub')) {
+          btn.addEventListener('click', () => {
+            this.map.closePopup();
+            UI.quickRouteTo(ap.iata);
+          });
+        }
       });
       marker.addTo(this.layers.airports);
       this.markers.airports[ap.iata] = marker;
@@ -87,17 +104,20 @@ const MapEngine = {
   },
 
   buildAirportPopup(ap) {
-    const dist = GS.company ? (() => {
-      const hub = getAirport(GS.company.hub);
-      return hub ? calcDistance(hub, ap) + ' km' : '-';
-    })() : '-';
+    const hub = GS.company ? getAirport(GS.company.hub) : null;
+    const isHub = hub && hub.iata === ap.iata;
+    const distKm = hub && !isHub ? calcDistance(hub, ap) : 0;
+    const distStr = isHub ? 'Votre hub' : (hub ? distKm.toLocaleString() + ' km' : '-');
+    const btn = isHub
+      ? `<button class="popup-route-btn is-hub" data-dest="${ap.iata}" disabled>⭐ Votre hub principal</button>`
+      : `<button class="popup-route-btn" data-dest="${ap.iata}">✈ Créer une route ici</button>`;
     return `<div class="popup-title">${ap.city} (${ap.iata})</div>
       <div class="popup-row"><span>Pays</span><strong>${ap.country}</strong></div>
       <div class="popup-row"><span>Demande PAX</span><strong>${ap.demandPax.toLocaleString()}/j</strong></div>
-      <div class="popup-row"><span>Cargo</span><strong>${ap.demandCargo} t/j</strong></div>
       <div class="popup-row"><span>Attractivité</span><strong>${ap.attractivity}/10</strong></div>
       <div class="popup-row"><span>Taxe d'atterrissage</span><strong>$${ap.landingFee.toLocaleString()}</strong></div>
-      <div class="popup-row"><span>Dist. depuis hub</span><strong>${dist}</strong></div>`;
+      <div class="popup-row"><span>Dist. depuis hub</span><strong>${distStr}</strong></div>
+      ${btn}`;
   },
 
   renderRoutes() {
@@ -142,7 +162,8 @@ const MapEngine = {
         return;
       }
       const model = getAircraftModel(aircraft.modelId);
-      const icon = this.buildAircraftIcon(aircraft.heading || 0, '#00d4ff', model);
+      const label = aircraft.flightId || (GS.company ? GS.company.iata : '');
+      const icon = this.buildAircraftIcon(aircraft.heading || 0, '#00d4ff', model, label, false);
       if (this.markers.aircraft[aircraft.id]) {
         this.markers.aircraft[aircraft.id]
           .setLatLng([aircraft.lat, aircraft.lon])
@@ -176,7 +197,8 @@ const MapEngine = {
         }
         return;
       }
-      const icon = this.buildAircraftIcon(ac.heading || 90, ai.color || '#ff6b35', null);
+      const model = getAircraftModel(ac.modelId);
+      const icon = this.buildAircraftIcon(ac.heading || 90, ai.color || '#ff6b35', model, ai.iata || 'AI', true);
       if (this.markers.aiAircraft[ac.id]) {
         this.markers.aiAircraft[ac.id]
           .setLatLng([ac.lat, ac.lon])
@@ -190,17 +212,26 @@ const MapEngine = {
     });
   },
 
-  buildAircraftIcon(heading, color, model) {
-    const size = model && model.category === 'widebody' ? 24 : 20;
-    const r = heading - 90;
-    const svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
-      style="transform:rotate(${r}deg);filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">
-      <path d="M21 15l-9-5.5L3 15V13l9-9.5 9 9.5v2z" fill="${color}" opacity="0.95"/>
-      <path d="M12 3.5L3 13v2l9-5.5 9 5.5v-2L12 3.5z" fill="${color}" opacity="0.5"/>
-    </svg>`;
+  buildAircraftIcon(heading, color, model, label, isAI) {
+    const size = model && model.category === 'widebody' ? 34
+               : model && model.category === 'supersonic' ? 32
+               : model && (model.category === 'turboprop' || model.category === 'regional_jet') ? 26
+               : 30;
+    const r = (heading || 0);   // SVG nose points north (0°); heading is CW from north
+    // Detailed top-down airplane silhouette (nose points up at 0°)
+    const plane = `<svg class="ac-plane-svg" width="${size}" height="${size}" viewBox="0 0 32 32"
+        style="transform:translate(-50%,-50%) rotate(${r}deg)" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 1.5c-1 0-1.7 1.4-1.9 3.4l-.3 6.2-11 6.1c-.5.3-.8.8-.8 1.4v1.3l11.9-3.4.3 6.3-3.2 2.4c-.3.2-.5.6-.5 1v.9l5.5-1.6h.4l5.5 1.6v-.9c0-.4-.2-.8-.5-1l-3.2-2.4.3-6.3 11.9 3.4v-1.3c0-.6-.3-1.1-.8-1.4l-11-6.1-.3-6.2C17.7 2.9 17 1.5 16 1.5z"
+          fill="${color}" stroke="#06101f" stroke-width="0.9" stroke-linejoin="round"/>
+        <ellipse cx="16" cy="9" rx="1" ry="3.4" fill="#fff" opacity="0.45"/>
+      </svg>`;
+    const glow = `<div class="ac-plane-glow" style="background:radial-gradient(circle, ${color}55 0%, transparent 65%)"></div>`;
+    const pulse = `<div class="ac-pulse-ring" style="color:${color}"></div>`;
+    const tag = label ? `<div class="ac-label ${isAI ? 'ai' : ''}">${label}</div>` : '';
+    const html = `<div class="ac-plane-wrap">${pulse}${glow}${plane}${tag}</div>`;
     return L.divIcon({
       className: 'ac-marker',
-      html: svg,
+      html,
       iconSize: [size, size],
       iconAnchor: [size/2, size/2],
     });

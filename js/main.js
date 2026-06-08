@@ -10,24 +10,21 @@
   let lastDayTick = 0;
 
   /* ===== STARTER CONTENT FOR NEW GAME ===== */
-  function giveStarterContent() {
+  function makeStarterAircraft(modelId, num) {
     const hub = getAirport(GS.company.hub);
-    if (!hub) return;
-
-    // Free starter ATR-72
-    const starterAc = {
+    return {
       id: GS.genId(),
-      modelId: 'atr72',
-      name: GS.company.iata + '-001',
+      modelId,
+      name: GS.company.iata + '-' + String(num).padStart(3, '0'),
       status: 'available',
-      condition: 95,
+      condition: 96,
       ageHours: 0,
       routeId: null,
       flightId: null,
       phase: 'ground',
       progress: 0,
-      lat: hub.lat,
-      lon: hub.lon,
+      lat: hub ? hub.lat : 0,
+      lon: hub ? hub.lon : 0,
       heading: 90,
       passengers: 0,
       currentAlt: 0,
@@ -35,9 +32,18 @@
       leased: false,
       leaseCost: 0,
     };
-    GS.fleet.push(starterAc);
+  }
 
-    // Find best reachable destination (within ATR-72 range, good demand)
+  function giveStarterContent() {
+    const hub = getAirport(GS.company.hub);
+    if (!hub) return;
+
+    // Two free starter aircraft: one flies immediately, one stays parked
+    const flyer = makeStarterAircraft('atr72', 1);
+    const parked = makeStarterAircraft('crj900', 2);
+    GS.fleet.push(flyer, parked);
+
+    // Auto-launch the first aircraft toward the best nearby destination
     const model = getAircraftModel('atr72');
     if (model) {
       const candidates = AIRPORTS.filter(ap => {
@@ -48,7 +54,7 @@
 
       if (candidates.length > 0) {
         const dest = candidates[0];
-        const result = RouteEngine.createRoute(hub.iata, dest.iata, starterAc.id, {
+        const result = RouteEngine.createRoute(hub.iata, dest.iata, flyer.id, {
           cabinConfig: { economy: 0.85, premeco: 0.10, business: 0.05, first: 0 },
         });
         if (result.success) {
@@ -66,36 +72,36 @@
     const destName = firstRoute ? (getAirport(firstRoute.destination)?.city || firstRoute.destination) : '-';
     const profit = firstRoute ? Economy.calcRouteProfit(firstRoute) : 0;
     UI.showModal('🎮 Bienvenue dans Hakvision Aircraft !', `
-      <div style="text-align:center;padding:8px 0 16px">
+      <div style="text-align:center;padding:8px 0 14px">
         <div style="font-size:48px;margin-bottom:10px">✈</div>
         <h3 style="color:#fff;font-size:16px;margin-bottom:6px">Votre empire aérien commence !</h3>
         <p style="color:var(--txt-dim);font-size:13px;line-height:1.6">
           Capital de départ : <strong style="color:var(--gold)">$50,000,000</strong><br>
-          Vous avez reçu un <strong style="color:var(--cyan)">ATR 72-600 gratuit</strong>
-          ${firstRoute ? ` en route vers <strong style="color:var(--cyan)">${destName}</strong>` : ''} !
+          Vous avez reçu <strong style="color:var(--cyan)">2 appareils gratuits</strong> :
+          un ATR 72 ${firstRoute ? `déjà en vol vers <strong style="color:var(--cyan)">${destName}</strong>` : ''} et un CRJ-900 prêt à partir.
         </p>
       </div>
       ${firstRoute ? `<div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.2);border-radius:var(--radius);padding:12px;margin-bottom:14px;font-size:12px;text-align:center">
-        <div style="color:var(--green);font-weight:700;font-size:14px">Premier vol lancé automatiquement !</div>
-        <div style="color:var(--txt-dim);margin-top:4px">${firstRoute.origin} → ${firstRoute.destination} · Profit estimé : <span style="color:${profit>0?'var(--green)':'var(--red)'}">${profit>0?'+':''}$${Math.abs(profit).toLocaleString()}</span>/vol</div>
+        <div style="color:var(--green);font-weight:700;font-size:14px">🛫 Premier vol lancé automatiquement !</div>
+        <div style="color:var(--txt-dim);margin-top:4px">${firstRoute.origin} → ${firstRoute.destination} · ${profit>0?'+':''}$${Math.abs(profit).toLocaleString()}/vol · regardez l'avion sur la carte</div>
       </div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
-          <span style="font-size:22px;flex-shrink:0">✈</span>
-          <div><strong style="color:#fff;font-size:13px">Flotte</strong> → Achetez d'autres appareils dans le Marché<br><span style="font-size:11px;color:var(--txt-dim)">ATR-42 dès $21M · A320 à $101M</span></div>
+        <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border-h);border-radius:var(--radius);padding:11px 14px;display:flex;gap:12px;align-items:center">
+          <span style="font-size:22px;flex-shrink:0">👆</span>
+          <div><strong style="color:var(--cyan);font-size:13px">Touchez un aéroport sur la carte</strong><br><span style="font-size:11px;color:var(--txt-dim)">→ « Créer une route ici » ouvre une ligne en 1 clic !</span></div>
         </div>
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
-          <span style="font-size:22px;flex-shrink:0">🗺</span>
-          <div><strong style="color:#fff;font-size:13px">Routes</strong> → Créez de nouvelles liaisons aériennes<br><span style="font-size:11px;color:var(--txt-dim)">Sélectionnez départ, destination et appareil</span></div>
+          <span style="font-size:22px;flex-shrink:0">📊</span>
+          <div><strong style="color:#fff;font-size:13px">Barre du bas</strong> → Flotte · Routes · Compagnie · Stats · Admin<br><span style="font-size:11px;color:var(--txt-dim)">Toute la gestion est là</span></div>
         </div>
         <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:12px;align-items:center">
           <span style="font-size:22px;flex-shrink:0">⚡</span>
-          <div><strong style="color:#fff;font-size:13px">Admin</strong> → Ajoutez des fonds ou des appareils pour tester<br><span style="font-size:11px;color:var(--txt-dim)">Vitesse 5× activée — les vols durent quelques secondes</span></div>
+          <div><strong style="color:#fff;font-size:13px">Vitesse 5× activée</strong><br><span style="font-size:11px;color:var(--txt-dim)">Les vols se terminent en quelques secondes · changez en haut à droite</span></div>
         </div>
       </div>
     `, [
       { label: '🗺 Créer une route', cls: 'btn-primary', action: () => { UI.closeModal(); UI.openPanel('routes'); } },
-      { label: '✈ Voir la flotte', cls: 'btn-secondary', action: () => { UI.closeModal(); UI.openPanel('fleet'); } },
+      { label: 'Explorer la carte', cls: 'btn-ghost', action: () => { UI.closeModal(); } },
     ]);
   }
 

@@ -71,6 +71,8 @@ const AIEngine = {
         if (idx < ac.pathPoints.length) {
           ac.lat = ac.pathPoints[idx][0];
           ac.lon = ac.pathPoints[idx][1];
+          const nxt = ac.pathPoints[Math.min(ac.pathPoints.length - 1, idx + 1)];
+          if (nxt) ac.heading = RouteEngine.calcBearing(ac.lat, ac.lon, nxt[0], nxt[1]);
         }
       }
       ac.phase = FlightEngine.getPhaseForProgress(ac.progress);

@@ -44,10 +44,71 @@ const SaveSystem = {
       if (aiState) {
         AIEngine.loadAI(aiState);
       }
+      // Background simulation catch-up: advance time for while the game was closed
+      this.applyOfflineProgress();
       return true;
     } catch (e) {
       console.error('Load failed:', e);
       return false;
+    }
+  },
+
+  // Simulate game progress for time elapsed since last save
+  applyOfflineProgress() {
+    const meta = this.getMeta();
+    if (!meta || !meta.savedAt) return;
+    const savedAt = new Date(meta.savedAt);
+    const now = new Date();
+    const elapsedRealMs = now - savedAt;
+    if (elapsedRealMs < 60000) return; // less than 1 min, no catch-up needed
+
+    // Game time to add: based on Standard mode (8 game-min / real-sec)
+    // Cap at 7 days of game time to avoid overflow
+    const realMinutes = elapsedRealMs / 60000;
+    const gameMinutes = Math.min(realMinutes * 8, 7 * 24 * 60);
+    const gameMs = gameMinutes * 60 * 1000;
+
+    if (gameMinutes < 1) return;
+    GS.gameDate = new Date(GS.gameDate.getTime() + gameMs);
+
+    // Fast-complete any in-flight aircraft
+    let completedFlights = 0;
+    GS.fleet.forEach(aircraft => {
+      if (aircraft.status === 'flying' && aircraft.arrivalTime) {
+        const arrivalMs = new Date(aircraft.arrivalTime) - new Date(meta.savedAt);
+        if (arrivalMs <= elapsedRealMs * 8) {
+          aircraft.phase = 'arrived';
+          aircraft.progress = 1;
+          aircraft.status = 'ground';
+          aircraft.locationIata = aircraft.destination;
+          aircraft.currentAlt = 0;
+          aircraft.currentSpeed = 0;
+          completedFlights++;
+        }
+      }
+    });
+
+    // Award offline revenue approximation
+    const activeProfitableRoutes = GS.routes.filter(r => r.status === 'active');
+    if (activeProfitableRoutes.length > 0 && gameMinutes > 60) {
+      const hoursOffline = gameMinutes / 60;
+      let offlineRevenue = 0;
+      activeProfitableRoutes.forEach(r => {
+        const profit = Economy.calcRouteProfit(r);
+        if (profit > 0) {
+          // Estimate ~1 flight per 8h avg
+          const estimatedFlights = Math.floor(hoursOffline / 8);
+          offlineRevenue += profit * estimatedFlights;
+        }
+      });
+      if (offlineRevenue > 0) {
+        GS.addToBalance(offlineRevenue, 'offline', `Revenus hors ligne (${Math.round(hoursOffline)}h)`);
+        if (typeof UI !== 'undefined') {
+          setTimeout(() => {
+            UI.notify(`🛫 Hors ligne ${Math.round(realMinutes)}min · ${completedFlights} vols complétés · +$${offlineRevenue.toLocaleString()} de revenus`, 'success', 7000);
+          }, 2000);
+        }
+      }
     }
   },
 

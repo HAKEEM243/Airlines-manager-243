@@ -56,10 +56,6 @@ const RouteEngine = {
     aircraft.status = 'assigned';
     aircraft.routeId = route.id;
     this.launchFlight(route, aircraft);
-    if (typeof Progression !== 'undefined') {
-      Progression.addXP(40, 'new_route');
-      Progression.checkAchievements();
-    }
     return { success: true, route };
   },
 

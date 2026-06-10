@@ -151,11 +151,10 @@
       </div>
       <div class="hdr-ctrl">
         <div class="speed-bar">
-          <button class="spd" data-speed="0" title="Pause">⏸</button>
-          <button class="spd active" data-speed="1">1×</button>
-          <button class="spd" data-speed="2">2×</button>
-          <button class="spd" data-speed="5">5×</button>
-          <button class="spd" data-speed="10">10×</button>
+          <button class="spd" data-mode="paused" title="Pause">⏸</button>
+          <button class="spd" data-mode="realistic" title="Réaliste — vols visibles longtemps">Réaliste</button>
+          <button class="spd active" data-mode="standard" title="Standard — rythme équilibré">Standard</button>
+          <button class="spd" data-mode="fast" title="Rapide — développement accéléré">Rapide</button>
         </div>
         <button class="icon-btn" id="btn-save" title="Sauvegarder">💾</button>
       </div>
@@ -239,7 +238,8 @@
 <script src="js/engine/gameState.js"></script>
 <script src="js/engine/save.js"></script>
 <script src="js/engine/economy.js"></script>
-<script src="js/engine/progression.js"></script>
+<script src="js/engine/certifications.js"></script>
+<script src="js/engine/notifications.js"></script>
 <script src="js/engine/routes.js"></script>
 <script src="js/engine/flight.js"></script>
 <script src="js/engine/ai.js"></script>

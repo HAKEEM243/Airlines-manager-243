@@ -852,3 +852,93 @@
 @media (max-width: 480px) {
   .ach-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ===== NEW: COMPANY HERO (replaces XP hero) ===== */
+.company-hero {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(135deg, rgba(0,212,255,0.08), rgba(10,30,60,0.6));
+  border: 1px solid var(--border-h); border-radius: 14px;
+  padding: 16px; margin-bottom: 16px;
+}
+.ch-logo { font-size: 36px; line-height: 1; flex-shrink: 0; }
+.ch-info { flex: 1; min-width: 0; }
+.ch-name { font-family: var(--font-hdr); font-size: 15px; font-weight: 700; color: #fff; }
+.ch-position { font-size: 11px; color: var(--cyan); margin: 2px 0; }
+.ch-rep { font-size: 14px; }
+.ch-mode { text-align: center; flex-shrink: 0; }
+
+/* ===== NEW: QUALIFICATION SYSTEM ===== */
+.qual-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; margin-bottom: 10px;
+  transition: border .2s;
+}
+.qual-card:hover { border-color: var(--border-h); }
+.qual-pilot-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.qual-pilot-name { font-size: 13px; font-weight: 700; color: #fff; }
+.qual-pilot-exp { font-size: 11px; color: var(--txt-dim); }
+.qual-training-banner {
+  background: rgba(255,190,0,0.12); border: 1px solid rgba(255,190,0,0.3);
+  border-radius: 8px; padding: 7px 10px; font-size: 12px; color: var(--gold);
+  margin-bottom: 8px;
+}
+.qual-ratings { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; min-height: 22px; }
+.qual-badge { font-size: 10px; border-radius: 5px; padding: 3px 8px; font-weight: 600; }
+.qual-got { background: rgba(0,232,122,0.12); color: #00e87a; border: 1px solid rgba(0,232,122,0.25); }
+.qual-train-section { display: flex; gap: 8px; align-items: center; }
+.qual-fam-sel {
+  flex: 1; background: var(--bg-dark); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--txt); padding: 7px 10px; font-size: 12px;
+  font-family: var(--font-body);
+}
+
+/* ===== MARKET SHARE in speed bar ===== */
+.speed-bar .spd[data-mode="realistic"] { font-size: 10px; }
+.speed-bar .spd[data-mode="standard"]  { font-size: 10px; }
+.speed-bar .spd[data-mode="fast"]      { font-size: 10px; }
+
+/* ===== ROUTE CARD: market share stat ===== */
+.ivs-val[style*="cyan"] { color: var(--cyan) !important; }
+
+
+/* ===== SERVICES PANEL (ancillary revenue, cabin levels, livery) ===== */
+.svc-card {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+  transition: border .2s;
+}
+.svc-card:hover { border-color: var(--border-h); }
+.svc-icon { font-size: 26px; flex-shrink: 0; }
+.svc-info { flex: 1; min-width: 0; }
+.svc-name { font-size: 13px; font-weight: 700; color: #fff; }
+.svc-desc { font-size: 11px; color: var(--txt-dim); margin: 2px 0; }
+.svc-rev { font-size: 12px; color: var(--green); font-weight: 600; }
+
+.svc-levels { display: flex; gap: 6px; }
+.svc-level {
+  flex: 1; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 6px; text-align: center;
+  transition: all .2s;
+}
+.svc-level.active {
+  border-color: var(--cyan); background: rgba(0,212,255,0.08);
+}
+.svc-lvl-num { font-family: var(--font-hdr); font-size: 18px; font-weight: 700; color: var(--cyan); }
+.svc-lvl-name { font-size: 9px; color: var(--txt-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ----- Toggle switch (reuse for services) ----- */
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; cursor: pointer; inset: 0;
+  background: rgba(255,255,255,0.1); border-radius: 24px;
+  transition: .3s;
+}
+.toggle-slider:before {
+  content: ''; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: var(--txt-dim);
+  border-radius: 50%; transition: .3s;
+}
+input:checked + .toggle-slider { background: var(--cyan); }
+input:checked + .toggle-slider:before { transform: translateX(20px); background: #fff; }

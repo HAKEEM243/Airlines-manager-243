@@ -254,15 +254,15 @@ const UI = {
     if (!models.length) return '<div class="empty-state"><div class="es-icon">🔍</div><p>Aucun appareil trouvé.</p></div>';
     const catLabel = { turboprop:'Turbopropulseur', regional_jet:'Jet Régional', narrowbody:'Court-courrier', widebody:'Long-courrier', cargo:'Cargo', supersonic:'Supersonique' };
     const canAfford = m => GS.finances.balance >= m.purchasePrice;
-    const hasProg = typeof Progression !== 'undefined';
     return models.map(m => {
-      const locked = hasProg && !Progression.isCategoryUnlocked(m.category);
-      const unlockLvl = hasProg ? Progression.categoryUnlockLevel(m.category) : 1;
+      const hasRating = typeof TypeRatings !== 'undefined' ? TypeRatings.hasAnyQualifiedPilot(m.id) : true;
+      const famId = typeof TypeRatings !== 'undefined' ? TypeRatings.getFamilyForModel(m.id) : null;
+      const famName = famId && TypeRatings.FAMILIES[famId] ? TypeRatings.FAMILIES[famId].name : '';
       return `
-      <div class="mac-v2 ${locked?'mac-v2-locked':''}" data-macid="${m.id}">
+      <div class="mac-v2" data-macid="${m.id}">
         <div class="mac-v2-illustration">
           ${typeof getAircraftImage === 'function' ? getAircraftImage(m.category) : ''}
-          ${locked ? `<div class="mac-v2-lock-overlay"><div class="mac-v2-lock-ico">🔒</div><div class="mac-v2-lock-txt">Niveau ${unlockLvl} requis</div></div>` : ''}
+          ${!hasRating ? `<div class="mac-v2-lock-overlay" style="background:rgba(200,140,0,0.88)"><div class="mac-v2-lock-ico">🎓</div><div class="mac-v2-lock-txt">Qualification pilote requise</div></div>` : ''}
         </div>
         <div class="mac-v2-body">
           <div class="mac-v2-top">
@@ -299,14 +299,13 @@ const UI = {
           </div>
           <p class="mac-v2-desc">${m.description}</p>
           <div class="mac-v2-actions">
-            ${locked
-              ? `<button class="mac-v2-btn-buy mac-v2-btn-disabled" disabled><span>🔒</span> Débloqué au niveau ${unlockLvl}</button>`
-              : `<button class="mac-v2-btn-buy ${canAfford(m)?'':'mac-v2-btn-disabled'}" data-buy="${m.id}" ${canAfford(m)?'':'disabled'}>
-                  <span>✈</span> Acheter
-                </button>
-                <button class="mac-v2-btn-lease" data-lease="${m.id}">
-                  <span>📋</span> Louer
-                </button>`}
+            ${!hasRating ? `<div style="font-size:11px;color:var(--gold);margin-bottom:6px">🎓 Qualifiez un pilote ${famName} pour exploiter cet appareil</div>` : ''}
+            <button class="mac-v2-btn-buy ${canAfford(m)?'':'mac-v2-btn-disabled'}" data-buy="${m.id}" ${canAfford(m)?'':'disabled'}>
+              <span>✈</span> Acheter
+            </button>
+            <button class="mac-v2-btn-lease" data-lease="${m.id}">
+              <span>📋</span> Louer
+            </button>
           </div>
         </div>
       </div>
@@ -325,10 +324,6 @@ const UI = {
   buyAircraft(modelId, lease) {
     const model = getAircraftModel(modelId);
     if (!model) return;
-    if (typeof Progression !== 'undefined' && !Progression.isCategoryUnlocked(model.category)) {
-      this.notify(`Cet appareil se débloque au niveau ${Progression.categoryUnlockLevel(model.category)}.`, 'warning');
-      return;
-    }
     const cost = lease ? Math.round(model.purchasePrice * 0.002) : model.purchasePrice;
     if (!lease && GS.finances.balance < cost) {
       this.notify('Fonds insuffisants.', 'error'); return;
@@ -374,24 +369,11 @@ const UI = {
         this.refreshPanel();
         this.notify(`${name} ajouté à votre flotte !`, 'success');
         if (GS.company) GS.addReputation(0.5);
-        if (typeof Progression !== 'undefined') {
-          Progression.addXP(lease ? 15 : 30, 'aircraft');
-          Progression.checkAchievements();
-        }
       }},
     ]);
   },
 
   renderCustomEditor(container) {
-    if (typeof Progression !== 'undefined' && !Progression.isCustomUnlocked()) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="es-icon">🔒</div>
-          <p>L'éditeur d'appareil personnalisé se débloque au <strong style="color:var(--cyan)">niveau ${Progression.CUSTOM_EDITOR_LEVEL}</strong>.</p>
-          <p style="margin-top:8px;font-size:12px;color:var(--txt-dim)">Niveau actuel : ${Progression.getLevel()} — continuez à développer votre réseau pour le débloquer.</p>
-        </div>`;
-      return;
-    }
     const baseModels = AIRCRAFT_MODELS.filter(m => m.category !== 'cargo' && m.category !== 'supersonic');
     let selectedBase = baseModels[0];
     let customData = {
@@ -662,6 +644,10 @@ const UI = {
           <div class="ivs-val">${lf}<span class="ivs-unit">%</span></div>
           <div class="ivs-lbl">Remplissage</div>
         </div>
+        <div class="itin-v2-stat">
+          <div class="ivs-val" style="color:var(--cyan)">${typeof MarketShare!=='undefined'?MarketShare.calcShare(r)*100|0:'-'}<span class="ivs-unit">%</span></div>
+          <div class="ivs-lbl">Part marché</div>
+        </div>
         <div class="itin-v2-cabin">
           <span class="cab-badge cab-eco">Y${eco}%</span>
           <span class="cab-badge cab-biz">J${biz}%</span>
@@ -875,6 +861,7 @@ const UI = {
     const tabs = [
       { id:'finances', label:'💰 Finances' },
       { id:'crew', label:'👤 Équipage' },
+      { id:'services', label:'✈ Services' },
       { id:'alliances', label:'🤝 Alliances' },
       { id:'marketing', label:'📣 Marketing' },
       { id:'events', label:'⚡ Événements' },
@@ -889,6 +876,7 @@ const UI = {
       switch(activeTab) {
         case 'finances': this.renderFinances(content); break;
         case 'crew': this.renderCrew(content); break;
+        case 'services': this.renderServices(content); break;
         case 'alliances': this.renderAlliances(content); break;
         case 'marketing': this.renderMarketing(content); break;
         case 'events': this.renderEvents(content); break;
@@ -1033,43 +1021,227 @@ const UI = {
   },
 
   renderCrew(container) {
-    container.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="kpi-card" style="flex:1;margin-right:8px"><div class="kpi-label">Effectif total</div><div class="kpi-value">${GS.crew.length}</div></div>
-        <div class="kpi-card" style="flex:1"><div class="kpi-label">Masse salariale</div><div class="kpi-value negative">$${GS.crew.reduce((s,c)=>s+c.salary,0).toLocaleString()}/mois</div></div>
-      </div>
-      ${GS.crew.map(c=>`<div class="crew-card">
-        <div class="crew-avatar">${c.type==='pilot'?'🎖':'🧑‍✈️'}</div>
-        <div class="crew-info">
-          <div class="crew-name">${c.name}</div>
-          <div class="crew-role">${c.role} ${c.longHaulSpec?'· 🌍 Long-courrier':''}</div>
-          <div class="crew-stats">
-            <div class="crew-skill" style="margin-right:12px">Exp: ${c.experience}%
-              <div class="crew-bar"><div class="crew-bar-fill" style="width:${c.experience}%;background:var(--cyan)"></div></div>
-            </div>
-            <div class="crew-skill">Fiabilité: ${c.reliability}%
-              <div class="crew-bar"><div class="crew-bar-fill" style="width:${c.reliability}%;background:var(--green)"></div></div>
-            </div>
-          </div>
+    let activeTab = 'roster';
+    const render = () => {
+      const salaries = GS.crew.reduce((s,c)=>s+c.salary,0);
+      const pilots = GS.crew.filter(c => c.type === 'pilot');
+      container.innerHTML = `
+        <div style="display:flex;gap:6px;margin-bottom:12px">
+          <div class="kpi-card" style="flex:1"><div class="kpi-label">Effectif</div><div class="kpi-value">${GS.crew.length}</div></div>
+          <div class="kpi-card" style="flex:1"><div class="kpi-label">Pilotes</div><div class="kpi-value">${pilots.length}</div></div>
+          <div class="kpi-card" style="flex:1"><div class="kpi-label">Salaires/mois</div><div class="kpi-value negative" style="font-size:11px">$${salaries.toLocaleString()}</div></div>
         </div>
-        <div style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap">$${c.salary.toLocaleString()}/mois</div>
-      </div>`).join('')}
-      <button class="btn-secondary w100 mt2" id="btn-hire">+ Recruter du personnel ($15,000)</button>
+        <div class="inner-tabs" style="margin-bottom:10px">
+          <button class="inner-tab ${activeTab==='roster'?'active':''}" data-it="roster">👤 Personnel</button>
+          <button class="inner-tab ${activeTab==='qualifications'?'active':''}" data-it="qualifications">🎓 Qualifications</button>
+        </div>
+        <div id="crew-content"></div>
+        <button class="btn-secondary w100 mt2" id="btn-hire">+ Recruter du personnel ($15,000)</button>
+      `;
+      container.querySelectorAll('.inner-tab').forEach(btn => { btn.addEventListener('click', () => { activeTab = btn.dataset.it; render(); }); });
+      const content = document.getElementById('crew-content');
+      if (activeTab === 'roster') {
+        content.innerHTML = GS.crew.map(c => {
+          const ratingCount = c.typeRatings ? c.typeRatings.length : 0;
+          const trainingLeft = c.inTraining ? (typeof TypeRatings !== 'undefined' ? TypeRatings.getDaysRemaining(c) : '?') : 0;
+          return `<div class="crew-card">
+            <div class="crew-avatar">${c.type==='pilot'?'🎖':'🧑‍✈️'}</div>
+            <div class="crew-info">
+              <div class="crew-name">${c.name}</div>
+              <div class="crew-role">${c.role}${c.type==='pilot'?' · '+ratingCount+' qualification'+(ratingCount!==1?'s':''):''}</div>
+              ${c.inTraining ? `<div style="font-size:11px;color:var(--gold)">📚 Formation en cours (${trainingLeft}j restants)</div>` : ''}
+              <div class="crew-stats">
+                <div class="crew-skill">Exp: ${c.experience}%<div class="crew-bar"><div class="crew-bar-fill" style="width:${c.experience}%;background:var(--cyan)"></div></div></div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--gold);font-weight:600;white-space:nowrap">$${c.salary.toLocaleString()}/mois</div>
+          </div>`;
+        }).join('');
+      } else {
+        this.renderQualifications(content);
+      }
+      document.getElementById('btn-hire')?.addEventListener('click', () => {
+        if (GS.finances.balance < 15000) { this.notify('Fonds insuffisants.','error'); return; }
+        GS.addToBalance(-15000, 'crew', 'Recrutement');
+        const isPilot = Math.random() > 0.5;
+        const crew = {
+          id: GS.genId(), name: ['Alex Leroy','Maria Santos','James Wright','Aiko Yamamoto','Kwame Mensah','Selin Demir','Carlos Ruiz'][Math.floor(Math.random()*7)],
+          role: isPilot?'Commandant de bord':'Agent de bord', type: isPilot?'pilot':'cabin',
+          experience: 20+Math.floor(Math.random()*40), reliability: 50+Math.floor(Math.random()*40),
+          longHaulSpec: Math.random()>0.6, salary: isPilot?7000+Math.floor(Math.random()*3000):2000+Math.floor(Math.random()*1000),
+          assignedAircraft: null, typeRatings: isPilot ? ['atr'] : [],
+        };
+        GS.crew.push(crew);
+        this.notify(`${crew.name} recruté !`, 'success');
+        render();
+      });
+    };
+    render();
+  },
+
+  renderQualifications(container) {
+    if (typeof TypeRatings === 'undefined') {
+      container.innerHTML = '<p>Système de qualifications non disponible.</p>';
+      return;
+    }
+    const pilots = GS.crew.filter(c => c.type === 'pilot');
+    if (!pilots.length) {
+      container.innerHTML = '<div class="empty-state"><p>Aucun pilote dans votre équipe.</p></div>';
+      return;
+    }
+    const families = TypeRatings.FAMILIES;
+    container.innerHTML = `
+      <div style="font-size:12px;color:var(--txt-dim);margin-bottom:12px;line-height:1.6">
+        Les pilotes doivent être qualifiés sur chaque famille d'appareils. Sans qualification, les achats sont possibles mais les vols ne peuvent pas être lancés.
+      </div>
+      ${pilots.map(p => {
+        const ratings = p.typeRatings || [];
+        const trainingLeft = p.inTraining ? TypeRatings.getDaysRemaining(p) : 0;
+        const famTraining = p.inTraining ? (families[p.inTraining] || {}).name : '';
+        return `<div class="qual-card">
+          <div class="qual-pilot-hdr">
+            <span class="qual-pilot-name">🎖 ${p.name}</span>
+            <span class="qual-pilot-exp">Exp ${p.experience}%</span>
+          </div>
+          ${p.inTraining ? `<div class="qual-training-banner">📚 Formation ${famTraining} — ${trainingLeft} jours restants</div>` : ''}
+          <div class="qual-ratings">
+            ${ratings.map(r => `<span class="qual-badge qual-got">${(families[r]||{}).name||r}</span>`).join('')}
+            ${!ratings.length && !p.inTraining ? '<span style="font-size:11px;color:var(--txt-dim)">Aucune qualification</span>' : ''}
+          </div>
+          ${!p.inTraining ? `<div class="qual-train-section">
+            <select class="qual-fam-sel" data-pid="${p.id}">
+              <option value="">— Choisir une formation —</option>
+              ${Object.entries(families).filter(([fId]) => !ratings.includes(fId)).map(([fId, fDef]) =>
+                `<option value="${fId}">${fDef.name} · $${fDef.cost.toLocaleString()} · ${fDef.trainingDays}j</option>`
+              ).join('')}
+            </select>
+            <button class="btn-secondary btn-sm qual-train-btn" data-pid="${p.id}">Lancer la formation</button>
+          </div>` : ''}
+        </div>`;
+      }).join('')}
     `;
-    document.getElementById('btn-hire')?.addEventListener('click', () => {
-      if (GS.finances.balance < 15000) { this.notify('Fonds insuffisants.','error'); return; }
-      GS.addToBalance(-15000, 'crew', 'Recrutement');
-      const isPilot = Math.random() > 0.5;
-      const crew = {
-        id: GS.genId(), name: ['Alex Leroy','Maria Santos','James Wright','Aiko Yamamoto','Kwame Mensah'][Math.floor(Math.random()*5)],
-        role: isPilot?'Commandant de bord':'Agent de bord', type: isPilot?'pilot':'cabin',
-        experience: 20+Math.floor(Math.random()*40), reliability: 50+Math.floor(Math.random()*40),
-        longHaulSpec: Math.random()>0.6, salary: isPilot?7000+Math.floor(Math.random()*3000):2000+Math.floor(Math.random()*1000),
-        assignedAircraft: null,
-      };
-      GS.crew.push(crew);
-      this.notify(`${crew.name} recruté !`, 'success');
-      this.renderCrew(container);
+    container.querySelectorAll('.qual-train-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pilotId = parseInt(btn.dataset.pid);
+        const sel = container.querySelector(`.qual-fam-sel[data-pid="${pilotId}"]`);
+        const family = sel ? sel.value : '';
+        if (!family) { this.notify('Sélectionnez une qualification.', 'warning'); return; }
+        const result = TypeRatings.startTraining(pilotId, family);
+        if (result.error) { this.notify(result.error, 'error'); return; }
+        const famName = (TypeRatings.FAMILIES[family] || {}).name || family;
+        this.notify(`Formation ${famName} lancée !`, 'success');
+        this.renderQualifications(container);
+      });
+    });
+  },
+
+  renderServices(container) {
+    if (!GS.company) return;
+    if (!GS.company.ancillary) GS.company.ancillary = {};
+    const anc = GS.company.ancillary;
+    const svc = GS.company.service || { level: 1, wifi: false, catering: false };
+
+    const services = [
+      { id:'seatFee',  label:'Frais de siège choisi', desc:'Supplément pour le choix du siège à la réservation.', icon:'💺', rev: 18, cost:0, toggle:true },
+      { id:'baggage',  label:'Bagages en soute payants', desc:'Première valise facturée séparément (modèle low-cost).', icon:'🧳', rev: 32, cost:0, toggle:true },
+      { id:'wifi',     label:'Wi-Fi payant à bord',    desc:'Connexion internet vendue $12/PAX.', icon:'📶', rev: 12, cost:50000, toggle:false },
+      { id:'meals',    label:'Service repas premium',  desc:'Repas chauds vendus à bord sur vols >2h.', icon:'🍽', rev: 22, cost:30000, toggle:false },
+    ];
+
+    // Cabin service level
+    const serviceLabels = ['', 'Basique', 'Confort', 'Premium', 'Affaires Elite', 'Luxe'];
+
+    container.innerHTML = `
+      <div class="section-title">Revenus Annexes (par PAX)</div>
+      <div style="font-size:12px;color:var(--txt-dim);margin-bottom:12px;line-height:1.6">
+        Configurez les services vendus à bord et les suppléments. Chaque service activé augmente les revenus par passager.
+      </div>
+      ${services.map(s => {
+        const active = s.toggle ? anc[s.id] !== false : !!anc[s.id];
+        const canBuy = !s.toggle && !active;
+        const affordable = GS.finances.balance >= s.cost;
+        return `<div class="svc-card">
+          <div class="svc-icon">${s.icon}</div>
+          <div class="svc-info">
+            <div class="svc-name">${s.label}</div>
+            <div class="svc-desc">${s.desc}</div>
+            <div class="svc-rev">+$${s.rev}/PAX</div>
+          </div>
+          ${s.toggle
+            ? `<label class="toggle-switch"><input type="checkbox" class="svc-toggle" data-svc="${s.id}" ${active?'checked':''}><span class="toggle-slider"></span></label>`
+            : active
+              ? `<div class="badge badge-green">Actif ✓</div>`
+              : `<button class="btn-primary btn-sm svc-buy" data-svc="${s.id}" ${affordable?'':'disabled'}>Activer $${s.cost.toLocaleString()}</button>`
+          }
+        </div>`;
+      }).join('')}
+
+      <div class="section-title" style="margin-top:20px">Niveau de Service Cabine</div>
+      <div style="font-size:12px;color:var(--txt-dim);margin-bottom:10px">Un meilleur service attire plus de passagers et améliore la réputation.</div>
+      <div class="svc-levels">
+        ${[1,2,3,4,5].map(lvl => {
+          const costs = [0, 500000, 2000000, 8000000, 25000000];
+          const active = svc.level === lvl;
+          const canUpgrade = svc.level < lvl && svc.level === lvl - 1;
+          return `<div class="svc-level ${active?'active':''}">
+            <div class="svc-lvl-num">${lvl}</div>
+            <div class="svc-lvl-name">${serviceLabels[lvl]}</div>
+            ${canUpgrade
+              ? `<button class="btn-primary btn-sm svc-upgrade" data-lvl="${lvl}" ${GS.finances.balance>=costs[lvl-1]?'':'disabled'}>$${(costs[lvl-1]/1e6).toFixed(1)}M</button>`
+              : active ? '<div style="font-size:9px;color:var(--cyan)">Actuel</div>' : ''}
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="section-title" style="margin-top:20px">Identité Visuelle</div>
+      <div style="display:flex;gap:12px;align-items:center;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px">
+        <div style="font-size:40px">${GS.company.logo || '✈'}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:#fff;margin-bottom:4px">${GS.company.name}</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="color" id="livery-color" value="${GS.company.liveryColor||'#00d4ff'}" style="width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:6px">
+            <input type="text" id="livery-logo" value="${GS.company.logo||'✈'}" maxlength="2" style="width:48px;background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;color:var(--txt);padding:6px;font-size:20px;text-align:center">
+            <button class="btn-secondary btn-sm" id="btn-save-livery">Appliquer</button>
+          </div>
+          <div style="font-size:11px;color:var(--txt-dim);margin-top:4px">Couleur de livrée · Logo de dérive</div>
+        </div>
+      </div>
+    `;
+
+    container.querySelectorAll('.svc-toggle').forEach(chk => {
+      chk.addEventListener('change', e => {
+        anc[e.target.dataset.svc] = e.target.checked;
+        this.notify(e.target.checked ? 'Service activé.' : 'Service désactivé.', 'info');
+      });
+    });
+    container.querySelectorAll('.svc-buy').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const svcDef = services.find(s => s.id === btn.dataset.svc);
+        if (!svcDef) return;
+        GS.addToBalance(-svcDef.cost, 'services', `Activation ${svcDef.label}`);
+        anc[btn.dataset.svc] = true;
+        this.notify(`${svcDef.label} activé !`, 'success');
+        this.renderServices(container);
+      });
+    });
+    container.querySelectorAll('.svc-upgrade').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lvl = parseInt(btn.dataset.lvl);
+        const costs = [0, 500000, 2000000, 8000000, 25000000];
+        const cost = costs[lvl - 1] || 0;
+        if (GS.finances.balance < cost) { this.notify('Fonds insuffisants.', 'error'); return; }
+        GS.addToBalance(-cost, 'services', `Amélioration service niveau ${lvl}`);
+        GS.company.service.level = lvl;
+        GS.addReputation(lvl * 3);
+        this.notify(`Service amélioré au niveau ${lvl} — ${serviceLabels[lvl]} !`, 'success');
+        this.renderServices(container);
+      });
+    });
+    document.getElementById('btn-save-livery')?.addEventListener('click', () => {
+      GS.company.liveryColor = document.getElementById('livery-color')?.value || '#00d4ff';
+      GS.company.logo = document.getElementById('livery-logo')?.value || '✈';
+      this.notify('Identité visuelle mise à jour !', 'success');
+      this.updateHeader();
     });
   },
 
@@ -1166,29 +1338,41 @@ const UI = {
     const totalRev = GS.getTotalRevenue();
     const ai = GS.ai;
     const inAir = GS.getFleetInAir().length;
-    const prog = typeof Progression !== 'undefined' ? Progression.getProgress() : null;
     const nw = typeof Finance !== 'undefined' ? Finance.netWorth() : balance;
     const debt = typeof Finance !== 'undefined' ? Finance.totalDebt() : 0;
+    const fv = typeof Finance !== 'undefined' ? Finance.fleetValue() : 0;
+    const pdm = typeof MarketShare !== 'undefined' ? MarketShare.totalShare() : 0;
+    const position = typeof MarketShare !== 'undefined' ? MarketShare.getPositionLabel() : '';
+    const totalPax = GS.company ? (GS.company.totalPaxCarried || 0) : 0;
+    const repStars = '⭐'.repeat(Math.min(5, Math.round(rep / 20))) + '☆'.repeat(Math.max(0, 5 - Math.round(rep / 20)));
+    const fmt = n => n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':n>=1e3?'$'+(n/1e3).toFixed(0)+'K':'$'+Math.round(n).toLocaleString();
+    const fuelPrice = GS.market ? GS.market.fuelPrice : 0.95;
+    const oilBarrel = GS.market ? (GS.market.oilBarrel || 80) : 80;
     body.innerHTML = `
-      ${prog ? `
-      <div class="prog-hero">
-        <div class="prog-hero-top">
-          <div class="prog-level-badge">${prog.level}</div>
-          <div class="prog-hero-info">
-            <div class="prog-title">${prog.title}</div>
-            <div class="prog-sub">${prog.isMax ? 'Niveau maximum atteint !' : `${prog.intoLevel.toLocaleString()} / ${prog.neededForNext.toLocaleString()} XP vers niveau ${prog.level+1}`}</div>
-          </div>
-          <div class="prog-rep">⭐ ${Math.round(rep)}</div>
+      <!-- COMPANY PROFILE -->
+      <div class="company-hero">
+        <div class="ch-logo">${GS.company?.logo || '✈'}</div>
+        <div class="ch-info">
+          <div class="ch-name">${GS.company?.name || '-'}</div>
+          <div class="ch-position">${position}</div>
+          <div class="ch-rep">${repStars} <span style="color:var(--txt-dim);font-size:12px">${Math.round(rep)}/100</span></div>
         </div>
-        <div class="prog-xp-bar"><div class="prog-xp-fill" style="width:${Math.round(prog.progress*100)}%"></div></div>
-      </div>` : ''}
+        <div class="ch-mode">
+          <div style="font-size:10px;color:var(--txt-dim);text-align:center">Mode</div>
+          <div style="font-size:13px;font-weight:700;color:var(--cyan)">${GS.timeMode==='realistic'?'Réaliste':GS.timeMode==='fast'?'Rapide':'Standard'}</div>
+        </div>
+      </div>
 
-      <div class="section-title">Vue d'Ensemble</div>
+      <div class="section-title">Indicateurs Clés</div>
       <div class="dashboard-grid">
         <div class="kpi-card"><div class="kpi-label">Capital</div><div class="kpi-value ${balance<0?'negative':''}">${GS.getBalanceFormatted()}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Valeur nette</div><div class="kpi-value ${nw<0?'negative':'positive'}">${nw>=1e9?'$'+(nw/1e9).toFixed(2)+'B':nw>=1e6?'$'+(nw/1e6).toFixed(1)+'M':'$'+Math.round(nw).toLocaleString()}</div>${debt>0?`<div class="kpi-sub">Dette ${debt>=1e6?'$'+(debt/1e6).toFixed(1)+'M':'$'+Math.round(debt).toLocaleString()}</div>`:''}</div>
-        <div class="kpi-card"><div class="kpi-label">Taux remplissage</div><div class="kpi-value ${lf>75?'positive':lf>50?'':'negative'}">${lf}%</div></div>
+        <div class="kpi-card"><div class="kpi-label">Valeur nette</div><div class="kpi-value ${nw<0?'negative':'positive'}">${fmt(nw)}</div>${debt>0?`<div class="kpi-sub text-red">Dette ${fmt(debt)}</div>`:''}</div>
+        <div class="kpi-card"><div class="kpi-label">Valeur flotte</div><div class="kpi-value">${fmt(fv)}</div><div class="kpi-sub">${GS.fleet.length} appareils</div></div>
+        <div class="kpi-card"><div class="kpi-label">Part de marché</div><div class="kpi-value" style="color:var(--cyan)">${pdm}%</div><div class="kpi-sub">sur vos routes</div></div>
+        <div class="kpi-card"><div class="kpi-label">Remplissage</div><div class="kpi-value ${lf>75?'positive':lf>50?'':'negative'}">${lf}%</div></div>
         <div class="kpi-card"><div class="kpi-label">Flotte en vol</div><div class="kpi-value ${inAir>0?'positive':''}">${inAir} / ${GS.fleet.length}</div></div>
+        <div class="kpi-card"><div class="kpi-label">PAX transportés</div><div class="kpi-value">${totalPax.toLocaleString()}</div><div class="kpi-sub">depuis création</div></div>
+        <div class="kpi-card"><div class="kpi-label">Pétrole brut</div><div class="kpi-value">$${oilBarrel}/bbl</div><div class="kpi-sub">Kérosène $${fuelPrice.toFixed(2)}/L</div></div>
       </div>
       ${GS.routes.length === 0 ? `
         <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:16px">

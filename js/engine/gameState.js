@@ -37,15 +37,12 @@ const GS = {
       iata: company.iata,
       hub: hubIata,
       reputation: 0,
-      level: 1,
-      xp: 0,
-      achievements: [],
       founded: new Date(this.gameDate),
       logo: '✈',
       alliance: null,
-      marketingLevel: 1,
       loyalty: { name: company.name + ' Miles', members: 0 },
       service: { level: 1, wifi: false, catering: false },
+      totalPaxCarried: 0,
     };
     this.fleet = [];
     this.routes = [];
@@ -62,10 +59,10 @@ const GS = {
     this.alliances = [];
     this.marketing.campaigns = [];
     this.cargo.contracts = GSHelpers.generateCargoContracts(5);
-    this.market = { fuelPrice: 0.95, demandMultiplier: 1.0 };
+    this.market = { fuelPrice: 0.95, demandMultiplier: 1.0, oilBarrel: 80 };
     this.ai = null;
     this.gameDate = new Date(2024, 0, 1);
-    this.gameSpeed = 1;
+    this.timeMode = 'standard';
     this.paused = false;
     this._nextId = 100;
     this._tickAccum = 0;
@@ -148,7 +145,7 @@ const GS = {
       settings: this.settings,
       aiState: this.ai ? this.ai.serialize() : null,
       gameDate: this.gameDate.toISOString(),
-      gameSpeed: this.gameSpeed,
+      timeMode: this.timeMode || 'standard',
       _nextId: this._nextId,
       _tickAccum: this._tickAccum || 0,
     });
@@ -177,12 +174,16 @@ const GS = {
     }
     this.alliances = d.alliances || [];
     this.cargo = d.cargo || { contracts: [], dedicated: [] };
-    this.market = d.market;
+    this.market = d.market || { fuelPrice: 0.95, demandMultiplier: 1.0, oilBarrel: 80 };
+    if (!this.market.oilBarrel) this.market.oilBarrel = 80;
     this.events = d.events || [];
     this.marketing = d.marketing || { campaigns: [], loyaltyPoints: 0 };
     if (d.settings) this.settings = { ...this.settings, ...d.settings };
+    if (this.company) {
+      if (!this.company.totalPaxCarried) this.company.totalPaxCarried = 0;
+    }
     this.gameDate = new Date(d.gameDate);
-    this.gameSpeed = d.gameSpeed;
+    this.timeMode = d.timeMode || 'standard';
     this._nextId = d._nextId;
     this._tickAccum = d._tickAccum || 0;
     return d.aiState;

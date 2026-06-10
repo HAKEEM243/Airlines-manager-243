@@ -7,6 +7,25 @@ const Economy = {
   BASE_TICKET_FIRST: 0.82,
   CARGO_RATE: 3.4,
 
+  // Ancillary revenue per passenger (configurable per company service profile)
+  ANCILLARY: {
+    seatFee:  { base: 18,  label: 'Frais de siège choisi' },
+    baggage:  { base: 32,  label: 'Bagages en soute' },
+    wifi:     { base: 12,  label: 'Wi-Fi à bord' },
+    meals:    { base: 22,  label: 'Repas à bord' },
+  },
+
+  // Returns total ancillary revenue per passenger based on company ancillary config
+  calcAncillaryPerPax(distanceKm) {
+    const config = GS.company ? (GS.company.ancillary || {}) : {};
+    let total = 0;
+    if (config.seatFee !== false) total += this.ANCILLARY.seatFee.base;
+    if (config.baggage !== false) total += this.ANCILLARY.baggage.base;
+    if (config.wifi) total += this.ANCILLARY.wifi.base;
+    if (config.meals || distanceKm > 2000) total += this.ANCILLARY.meals.base * (distanceKm > 2000 ? 1 : 0.5);
+    return Math.round(total);
+  },
+
   calcTicketPrice(distanceKm, cabinClass, qualityIndex = 1.0) {
     const base = { economy: this.BASE_TICKET_ECONOMY, premeco: this.BASE_TICKET_PREMECO, business: this.BASE_TICKET_BUSINESS, first: this.BASE_TICKET_FIRST };
     const rate = base[cabinClass] || base.economy;
@@ -24,8 +43,11 @@ const Economy = {
     const baseDemand = Math.sqrt(o.demandPax * d.demandPax) / 10;
     const attractMult = (o.attractivity + d.attractivity) / 20;
     const distPenalty = dist > 10000 ? 0.7 : dist > 6000 ? 0.85 : 1.0;
+    // Seasonal demand: tourism peaks in summer (Jul/Aug) and Christmas (Dec)
+    const month = GS.gameDate.getMonth(); // 0-11
+    const seasonal = [0.88, 0.86, 0.92, 0.95, 1.00, 1.08, 1.18, 1.20, 1.05, 0.97, 0.90, 1.12][month] || 1;
     const mkt = GS.market.demandMultiplier || 1;
-    return Math.round(baseDemand * attractMult * distPenalty * mkt);
+    return Math.round(baseDemand * attractMult * distPenalty * seasonal * mkt);
   },
 
   calcCargoRevenue(weightTons, distanceKm) {
@@ -46,7 +68,10 @@ const Economy = {
 
   calcFuelCost(model, durationHours) {
     if (!model) return 0;
-    return Math.round(model.fuelBurnPerHour * durationHours * GS.market.fuelPrice);
+    // fuelBurnPerHour is in liters/hour; fuelPrice is $/liter derived from oil barrel price
+    const lph = model.fuelBurnPerHour;
+    const pricePerLiter = GS.market.fuelPrice;
+    return Math.round(lph * durationHours * pricePerLiter);
   },
 
   calcMaintenanceCost(model, durationHours) {
@@ -80,11 +105,12 @@ const Economy = {
     if (cabin.business) ticketRevenue += this.calcTicketPrice(dist, 'business') * Math.round(paxCarried * (cabin.business || 0));
     if (cabin.first) ticketRevenue += this.calcTicketPrice(dist, 'first') * Math.round(paxCarried * (cabin.first || 0));
     const cargoRev = this.calcCargoRevenue(model.cargoCapacity * 0.6, dist);
+    const ancillaryRev = this.calcAncillaryPerPax(dist) * paxCarried;
     const fuelCost = this.calcFuelCost(model, duration);
     const landing = this.calcLandingFee(route.origin, model) + this.calcLandingFee(route.destination, model);
     const maintenance = this.calcMaintenanceCost(model, duration);
     const crew = this.calcCrewCost(model, duration);
-    return Math.round(ticketRevenue + cargoRev - fuelCost - landing - maintenance - crew);
+    return Math.round(ticketRevenue + cargoRev + ancillaryRev - fuelCost - landing - maintenance - crew);
   },
 
   processFlightCompletion(flight) {
@@ -107,6 +133,8 @@ const Economy = {
     if (cabin.first && cabin.first > 0) revenue += this.calcTicketPrice(dist, 'first') * Math.round(paxCarried * cabin.first);
     const cargoRev = this.calcCargoRevenue(model.cargoCapacity * 0.6, dist);
     revenue += cargoRev;
+    const ancillaryRev = this.calcAncillaryPerPax(dist) * paxCarried;
+    revenue += ancillaryRev;
     const fuelCost = this.calcFuelCost(model, duration);
     const landingFee = this.calcLandingFee(route.origin, model) + this.calcLandingFee(route.destination, model);
     const maintenanceCost = this.calcMaintenanceCost(model, duration);
@@ -121,6 +149,7 @@ const Economy = {
     GS.finances.costs.crew += crewCost;
     const repGain = loadFactor > 0.9 ? 0.3 : loadFactor > 0.75 ? 0.15 : 0.05;
     GS.addReputation(repGain);
+    if (GS.company) GS.company.totalPaxCarried = (GS.company.totalPaxCarried || 0) + paxCarried;
     flight.paxLastFlight = paxCarried;
     flight.profitLastFlight = profit;
     route.totalFlights = (route.totalFlights || 0) + 1;
@@ -161,8 +190,12 @@ const Economy = {
   },
 
   tickFuelPrice() {
-    const delta = (Math.random() - 0.5) * 0.08;
-    GS.market.fuelPrice = Math.max(0.55, Math.min(2.20, GS.market.fuelPrice + delta));
+    // Oil barrel price ($/barrel) drives jet fuel price ($/liter)
+    const oilDelta = (Math.random() - 0.5) * 4.5;
+    GS.market.oilBarrel = Math.max(40, Math.min(200, (GS.market.oilBarrel || 80) + oilDelta));
+    // Jet fuel ≈ oil barrel / 159 liters * 1.35 refining margin
+    GS.market.fuelPrice = Math.round((GS.market.oilBarrel / 159 * 1.35) * 100) / 100;
+    GS.market.fuelPrice = Math.max(0.40, Math.min(1.80, GS.market.fuelPrice));
   },
 
   maybeSpawnEvent() {

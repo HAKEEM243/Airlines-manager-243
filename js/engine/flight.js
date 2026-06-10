@@ -180,14 +180,6 @@ const FlightEngine = {
     aircraft.ageHours = (aircraft.ageHours || 0) + duration;
     aircraft.condition = Math.max(10, (aircraft.condition || 100) - duration * 0.05);
 
-    // Progression: award XP for completing the flight
-    if (typeof Progression !== 'undefined') {
-      const lf = route ? (route.loadFactor || 0.8) : 0.8;
-      const xp = Math.round(8 + lf * 10 + Math.max(0, (profit || 0)) / 50000);
-      Progression.addXP(xp, 'flight');
-      Progression.checkAchievements();
-    }
-
     // Maintenance: roll for an incident if checks are overdue
     let incident = null;
     if (typeof Maintenance !== 'undefined') {

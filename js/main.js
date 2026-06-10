@@ -3,7 +3,8 @@
   'use strict';
 
   const GAME_TICK_INTERVAL = 1000;
-  const MINUTES_PER_TICK_SPEED = { 0: 0, 1: 1, 2: 2, 5: 5, 10: 10 };
+  // Minutes of game time advanced per real second in each mode
+  const TIME_MODE_MINUTES = { paused: 0, realistic: 2, standard: 8, fast: 30 };
   let gameLoopTimer = null;
   let renderLoopId = null;
   let monthTickCounter = 0;
@@ -38,6 +39,11 @@
   function giveStarterContent() {
     const hub = getAirport(GS.company.hub);
     if (!hub) return;
+
+    // Give starter pilots their initial type ratings (ATR + CRJ, matching starter aircraft)
+    GS.crew.filter(c => c.type === 'pilot').forEach(p => {
+      p.typeRatings = ['atr', 'crj'];
+    });
 
     // Two free starter aircraft: one flies immediately, one stays parked
     const flyer = makeStarterAircraft('atr72', 1);
@@ -222,14 +228,19 @@
     }
     UI.updateHeader();
 
-    // Default to 5× speed for immediate visual feedback
-    GS.gameSpeed = 5;
+    // Default to Standard mode
+    GS.timeMode = GS.timeMode || 'standard';
     GS.paused = false;
-    document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.speed == 5));
+    document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.mode === (GS.timeMode || 'standard')));
 
     startGameLoop();
     startRenderLoop();
     SaveSystem.startAutoSave();
+
+    // Request push notification permission
+    if (typeof GameNotifications !== 'undefined') {
+      setTimeout(() => GameNotifications.requestPermission(), 3000);
+    }
 
     if (isNew) {
       giveStarterContent();
@@ -247,8 +258,9 @@
   }
 
   function gameTick() {
-    if (GS.paused || GS.gameSpeed === 0) return;
-    const minutes = MINUTES_PER_TICK_SPEED[GS.gameSpeed] || 1;
+    if (GS.paused) return;
+    const minutes = TIME_MODE_MINUTES[GS.timeMode || 'standard'] || 8;
+    if (minutes === 0) return;
     GS.gameDate = new Date(GS.gameDate.getTime() + minutes * 60 * 1000);
     GS._tickAccum = (GS._tickAccum || 0) + minutes;
     FlightEngine.tick(minutes);
@@ -258,7 +270,6 @@
       Economy.tickMonthlyCharges();
       Economy.tickFuelPrice();
       if (typeof Finance !== 'undefined') Finance.tickMonthly();
-      if (typeof Progression !== 'undefined') Progression.checkAchievements();
       monthTickCounter = 0;
     }
     if (GS._tickAccum - lastDayTick >= 1440) {
@@ -268,15 +279,17 @@
         if (UI.currentTab === 'company') UI.refreshPanel();
       }
       Economy.tickEvents();
+      if (typeof TypeRatings !== 'undefined') TypeRatings.tickTraining();
+      if (typeof GameNotifications !== 'undefined') GameNotifications.checkAlerts();
       lastDayTick = GS._tickAccum;
 
-      // Helpful guidance when the player is in the red
+      // Guidance when player is in the red
       if (GS.finances.balance < 0 && (GS._tickAccum - lastLowBalanceWarn) > 20160) {
         lastLowBalanceWarn = GS._tickAccum;
         const losing = GS.routes.filter(r => Economy.calcRouteProfit(r) < 0).length;
         const msg = losing > 0
-          ? `💸 Capital négatif ! ${losing} route(s) perdent de l'argent — ouvrez-les pour mettre un appareil plus petit, ou supprimez-les. Vous pouvez aussi emprunter (Compagnie → Finances).`
-          : `💸 Capital négatif ! Ouvrez plus de routes rentables ou contractez un prêt (Compagnie → Finances) pour vous refinancer.`;
+          ? `💸 Capital négatif ! ${losing} route(s) perdent de l'argent. Utilisez un appareil mieux dimensionné ou ouvrez de nouvelles lignes rentables.`
+          : `💸 Capital négatif ! Contractez un prêt (Compagnie → Finances) ou ouvrez plus de routes.`;
         UI.notify(msg, 'warning', 8000);
       }
     }
@@ -301,10 +314,11 @@
   function setupGameControls() {
     document.querySelectorAll('.spd').forEach(btn => {
       btn.addEventListener('click', () => {
-        const speed = parseInt(btn.dataset.speed);
-        GS.gameSpeed = speed;
-        GS.paused = speed === 0;
-        document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.speed == speed));
+        const mode = btn.dataset.mode;
+        if (!mode) return;
+        GS.timeMode = mode;
+        GS.paused = (mode === 'paused');
+        document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
       });
     });
 
@@ -353,9 +367,9 @@
       }
       if (e.key === ' ' && !e.target.matches('input,select,textarea')) {
         GS.paused = !GS.paused;
-        if (GS.paused) GS.gameSpeed = 0;
-        else GS.gameSpeed = 1;
-        document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.speed == GS.gameSpeed));
+        if (!GS.paused && (GS.timeMode === 'paused' || !GS.timeMode)) GS.timeMode = 'standard';
+        const activeMode = GS.paused ? 'paused' : (GS.timeMode || 'standard');
+        document.querySelectorAll('.spd').forEach(b => b.classList.toggle('active', b.dataset.mode === activeMode));
         e.preventDefault();
       }
       if (e.key === 's' && (e.ctrlKey || e.metaKey)) {

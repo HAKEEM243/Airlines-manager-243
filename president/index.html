@@ -89,6 +89,7 @@
       </div>
     </div>
     <button class="btn-start" id="btnStart">▶ PRENDRE LE POUVOIR</button>
+    <button class="btn-start btn-continue hidden" id="btnContinue">💾 CONTINUER LA PARTIE</button>
   </div>
 </div>
 
@@ -172,7 +173,11 @@
           <div class="app-icon" data-panel="sports"><div class="app-emoji">🏆</div><div class="app-label">Sports</div></div>
           <div class="app-icon" data-panel="resources"><div class="app-emoji">⛏️</div><div class="app-label">Ressources</div></div>
           <div class="app-icon" data-panel="editor"><div class="app-emoji">✏️</div><div class="app-label">God Mode</div></div>
-          <div class="app-icon" data-panel="diplomacy"><div class="app-emoji">🤝</div><div class="app-label">Alliances</div></div>
+          <div class="app-icon" data-panel="police"><div class="app-emoji">🚔</div><div class="app-label">Police</div></div>
+          <div class="app-icon" data-panel="social"><div class="app-emoji">🏛️</div><div class="app-label">Social</div></div>
+          <div class="app-icon" data-panel="population"><div class="app-emoji">👨‍👩‍👧</div><div class="app-label">Population</div></div>
+          <div class="app-icon" data-panel="worldmap"><div class="app-emoji">🗺️</div><div class="app-label">Monde</div></div>
+          <div class="app-icon" id="appSave"><div class="app-emoji">💾</div><div class="app-label">Sauver</div></div>
         </div>
         <div class="ticker-wrap"><div class="ticker" id="ticker">Chargement des actualités mondiales...</div></div>
       </div>
@@ -214,6 +219,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="infra-energy">Énergie</button>
           <button class="tab" data-tab="infra-road">Transport</button>
+          <button class="tab" data-tab="infra-networks">Réseaux</button>
           <button class="tab" data-tab="infra-build">Construction</button>
         </div>
         <div class="tab-content active" id="infra-energy">
@@ -226,6 +232,9 @@
           <div class="stat-row"><span>🛣️ Routes goudronnées</span><span id="roadKm">0 km</span></div>
           <div class="stat-row"><span>✈️ Aéroports internationaux</span><span id="airports">0</span></div>
           <div id="roadProjects"></div>
+        </div>
+        <div class="tab-content hidden" id="infra-networks">
+          <div id="networksQuality"></div>
         </div>
         <div class="tab-content hidden" id="infra-build">
           <div id="infraBuild"></div>
@@ -334,6 +343,47 @@
         <div class="panel-header"><button class="back-btn">← Retour</button><h3>⛏️ HUB MONDIAL DES RESSOURCES</h3></div>
         <div class="rdc-badge">🇨🇩 Module Exclusif RDC</div>
         <div id="resourceMarket"></div>
+      </div>
+
+      <!-- POLICE & JUSTICE -->
+      <div class="panel hidden" id="panel-police">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🚔 POLICE & JUSTICE</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="pol-stats">Statistiques</button>
+          <button class="tab" data-tab="pol-budget">Financement</button>
+          <button class="tab" data-tab="pol-opinions">Avis des gens</button>
+        </div>
+        <div class="tab-content active" id="pol-stats"></div>
+        <div class="tab-content hidden" id="pol-budget"></div>
+        <div class="tab-content hidden" id="pol-opinions"></div>
+      </div>
+
+      <!-- SOCIAL -->
+      <div class="panel hidden" id="panel-social">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🏛️ POLITIQUE SOCIALE</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="soc-fin">Financement</button>
+          <button class="tab" data-tab="soc-impact">Impact</button>
+        </div>
+        <div class="tab-content active" id="soc-fin"></div>
+        <div class="tab-content hidden" id="soc-impact"></div>
+      </div>
+
+      <!-- POPULATION -->
+      <div class="panel hidden" id="panel-population">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>👨‍👩‍👧 DÉMOGRAPHIE</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="pop-stats">Statistiques</button>
+          <button class="tab" data-tab="pop-policy">Politique familiale</button>
+        </div>
+        <div class="tab-content active" id="pop-stats"></div>
+        <div class="tab-content hidden" id="pop-policy"></div>
+      </div>
+
+      <!-- WORLD MAP -->
+      <div class="panel hidden" id="panel-worldmap">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🗺️ CARTE DU MONDE</h3></div>
+        <div id="worldMapBody"></div>
       </div>
 
       <!-- GOD MODE EDITOR -->

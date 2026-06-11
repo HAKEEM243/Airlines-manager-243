@@ -78,6 +78,23 @@ const UI = (() => {
       const name = ($('presName').value || 'Le Président').trim();
       startGame(selectedCountry, name, selectedDiff);
     });
+
+    // Bouton "Continuer" si une sauvegarde existe
+    if (Engine.hasSave()) {
+      const btn = $('btnContinue');
+      btn.classList.remove('hidden');
+      btn.addEventListener('click', () => {
+        if (Engine.load()) {
+          $('setup').classList.add('hidden');
+          $('game').classList.remove('hidden');
+          bindGame();
+          renderAll();
+          Engine.startTicker();
+          Engine.setSpeed(1);
+          setSpeedUI(1);
+        }
+      });
+    }
   }
 
   /* ── Game Start ── */
@@ -131,12 +148,23 @@ const UI = (() => {
     if (id === 'sports') renderSports();
     if (id === 'resources') renderResourceMarket();
     if (id === 'editor') renderEditor();
+    if (id === 'police') renderPolice();
+    if (id === 'social') renderSocial();
+    if (id === 'population') renderPopulation();
+    if (id === 'worldmap') renderWorldMap();
   }
 
   function bindGame() {
     // App icons
     document.querySelectorAll('.app-icon').forEach(icon => {
-      icon.addEventListener('click', () => showPanel(icon.dataset.panel));
+      if (icon.dataset.panel) icon.addEventListener('click', () => showPanel(icon.dataset.panel));
+    });
+
+    // Save button
+    const saveBtn = $('appSave');
+    if (saveBtn) saveBtn.addEventListener('click', () => {
+      Engine.save();
+      notify('💾 Partie sauvegardée !', 'success');
     });
 
     // Back buttons
@@ -401,6 +429,8 @@ const UI = (() => {
       </div>
     `).join('');
 
+    renderNetworks();
+
     $('infraBuild').innerHTML = `
       <div class="stat-row"><span>⚡ Capacité totale</span><span>${s.energyCap.toLocaleString()} MW</span></div>
       <div class="stat-row"><span>🔌 Taux électrification</span><span>${s.electrRate.toFixed(0)}%</span></div>
@@ -664,6 +694,234 @@ const UI = (() => {
     }).join('');
   }
 
+  /* ── Police & Justice ── */
+  function renderPolice() {
+    const s = Engine.get();
+    const year = s.date.getFullYear();
+
+    $('pol-stats').innerHTML = `
+      <div class="section-title">Les statistiques estimées sur l'année ${year} :</div>
+      ${CRIME_TYPES.map(c => `
+        <div class="crime-row">
+          <span>${c.name} :</span>
+          <span class="crime-val">${(s.crimes[c.id] || 0).toLocaleString('fr-FR')}</span>
+        </div>
+      `).join('')}
+      <div class="section-title" style="margin-top:16px">L'avis des gens sur la situation actuelle :</div>
+      ${s.opinions.slice(0, 5).map(o => `
+        <div class="opinion-item">
+          <span class="op-avatar">👤</span>
+          <div>
+            <div class="op-name">${o.name}, ${o.age} ans</div>
+            <div class="op-text">💬 ${o.text}</div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    $('pol-budget').innerHTML = `
+      <div class="budget-card">
+        <div class="budget-title">🚔 Budget de la Police Nationale</div>
+        <div class="slider-row">
+          <div class="slider-label"><span>Budget annuel</span><span class="slider-val" id="sv-pol">$${s.policeBudget}M</span></div>
+          <input type="range" min="20" max="${Math.max(500, Math.floor(s.gdp * 0.02))}" value="${s.policeBudget}"
+            oninput="document.getElementById('sv-pol').textContent='$'+this.value+'M'; Engine.setPoliceBudget(+this.value)">
+        </div>
+        <div class="stat-row"><span>👮 Effectifs</span><span>${Math.floor(s.policeBudget * 180).toLocaleString('fr-FR')} agents</span></div>
+        <div class="stat-row"><span>🚓 Véhicules de patrouille</span><span>${Math.floor(s.policeBudget * 4).toLocaleString('fr-FR')}</span></div>
+        <div class="stat-row"><span>📹 Caméras de surveillance</span><span>${Math.floor(s.policeBudget * 25).toLocaleString('fr-FR')}</span></div>
+        <div class="stat-row"><span>Efficacité</span><span>${s.policeBudget / s.population > 5 ? '🟢 Élevée' : s.policeBudget / s.population > 2 ? '🟡 Moyenne' : '🔴 Insuffisante'}</span></div>
+        <p style="color:var(--text-dim);font-size:12px;margin-top:8px">Un meilleur financement réduit directement la criminalité estimée.</p>
+      </div>
+    `;
+
+    $('pol-opinions').innerHTML = s.opinions.map(o => `
+      <div class="opinion-item">
+        <span class="op-avatar">👤</span>
+        <div>
+          <div class="op-name">${o.name}, ${o.age} ans</div>
+          <div class="op-text">💬 ${o.text}</div>
+        </div>
+      </div>
+    `).join('') || '<div class="empty-msg">Aucun avis pour le moment.</div>';
+  }
+
+  /* ── Social ── */
+  function renderSocial() {
+    const s = Engine.get();
+
+    $('soc-fin').innerHTML = s.social.map(p => `
+      <div class="policy-row">
+        <span class="policy-name">${p.name}</span>
+        <div class="stepper">
+          <button class="step-btn minus" onclick="Engine.setPolicy('${p.id}', -1)">−</button>
+          <span class="step-val">${p.val}</span>
+          <button class="step-btn plus" onclick="Engine.setPolicy('${p.id}', 1)">+</button>
+        </div>
+      </div>
+    `).join('');
+
+    const workWeek = Engine.getPolicy('workWeek');
+    $('soc-impact').innerHTML = `
+      <div class="stat-row"><span>💰 Coût social total/jour</span><span class="text-red">-$${(s.dailyExpenses * 0.3).toFixed(1)}M</span></div>
+      <div class="stat-row"><span>😊 Impact bonheur</span><span class="${workWeek <= 40 ? 'text-green' : 'text-red'}">${workWeek <= 40 ? '✅ Positif' : '⚠️ Négatif'}</span></div>
+      <div class="stat-row"><span>📈 Impact productivité</span><span>${workWeek >= 40 ? '🟢 ' : '🟡 '}${(80 + workWeek / 2).toFixed(0)}%</span></div>
+      <div class="stat-row"><span>👴 Retraités estimés</span><span>${(s.population * (70 - Engine.getPolicy('retirementAge')) * 0.012).toFixed(1)}M</span></div>
+      <div class="stat-row"><span>📊 Taux de chômage</span><span>${s.unemployment.toFixed(1)}%</span></div>
+      <p style="color:var(--text-dim);font-size:12px;padding:12px">
+        Des allocations généreuses augmentent le bonheur mais pèsent sur le budget.
+        Une semaine de travail courte plaît à la population mais réduit la productivité nationale.
+      </p>
+    `;
+  }
+
+  /* ── Population ── */
+  function renderPopulation() {
+    const s = Engine.get();
+    const popExact = Math.floor(s.population * 1e6);
+    const births = Math.floor(popExact * s.birthRate / 1000);
+    const deaths = Math.floor(popExact * s.mortality / 1000);
+    const natural = births - deaths;
+
+    $('pop-stats').innerHTML = `
+      <div class="crime-row"><span>Population :</span><span class="crime-val">${popExact.toLocaleString('fr-FR')}</span></div>
+      <div class="crime-row"><span>Taux de natalité :</span><span class="crime-val">${s.birthRate.toFixed(1)} ‰</span></div>
+      <div class="crime-row"><span>Taux de mortalité :</span><span class="crime-val">${s.mortality.toFixed(1)} ‰</span></div>
+      <div class="crime-row"><span>Naissances estimées/an :</span><span class="crime-val">${births.toLocaleString('fr-FR')}</span></div>
+      <div class="crime-row"><span>Décès estimés/an :</span><span class="crime-val">${deaths.toLocaleString('fr-FR')}</span></div>
+      <div class="crime-row"><span>Accroissement naturel :</span><span class="crime-val" style="color:${natural >= 0 ? 'var(--green-light)' : 'var(--red)'}">${natural >= 0 ? '+' : ''}${natural.toLocaleString('fr-FR')}</span></div>
+      <div class="crime-row"><span>Espérance de vie des hommes :</span><span class="crime-val">${Math.floor(s.lifeExpM)} ans</span></div>
+      <div class="crime-row"><span>Espérance de vie des femmes :</span><span class="crime-val">${Math.floor(s.lifeExpF)} ans</span></div>
+      <div class="crime-row"><span>Alphabétisation :</span><span class="crime-val">${s.literacy.toFixed(0)} %</span></div>
+      <div class="crime-row"><span>IDH :</span><span class="crime-val">${s.idh.toFixed(3)}</span></div>
+    `;
+
+    $('pop-policy').innerHTML = `
+      <div class="budget-card">
+        <div class="budget-title">👶 Politique familiale</div>
+        <button class="btn-sm btn-invest" style="width:100%;margin-bottom:8px"
+          onclick="const s=Engine.get(); if(s.treasury>=100){s.treasury-=100;s.birthRate+=0.5;UI.notify('👶 Allocations familiales renforcées (+0.5‰ natalité)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
+          💰 Allocations familiales (-$100M, natalité +0.5‰)
+        </button>
+        <button class="btn-sm btn-invest" style="width:100%;margin-bottom:8px"
+          onclick="const s=Engine.get(); if(s.treasury>=200){s.treasury-=200;s.mortality=Math.max(4,s.mortality-0.4);s.lifeExpM+=0.5;s.lifeExpF+=0.5;UI.notify('🏥 Campagne de vaccination nationale (-0.4‰ mortalité)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
+          💉 Campagne de vaccination (-$200M, mortalité -0.4‰)
+        </button>
+        <button class="btn-sm btn-invest" style="width:100%"
+          onclick="const s=Engine.get(); if(s.treasury>=150){s.treasury-=150;s.lifeExpM+=1;s.lifeExpF+=1;UI.notify('🍚 Programme nutrition (+1 an espérance de vie)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
+          🍚 Programme nutrition (-$150M, +1 an espérance de vie)
+        </button>
+      </div>
+    `;
+  }
+
+  /* ── Réseaux d'infrastructure ── */
+  function renderNetworks() {
+    const s = Engine.get();
+    const el = $('networksQuality');
+    if (!el || !s.networks) return;
+
+    el.innerHTML = `
+      <div class="stat-row"><span>🌍 La place en termes de l'infrastructure</span><span>${Engine.infraRank()}ème place</span></div>
+      ${s.networks.map(n => {
+        const def = NETWORK_DEFS.find(d => d.id === n.id);
+        const nstars = Engine.networkStars(n);
+        return `
+          <div class="network-card ${n.building ? 'net-building' : ''}">
+            <div class="net-head">
+              <span>${def.emoji} ${def.name}</span>
+              <span class="stars">${'★'.repeat(nstars)}${'☆'.repeat(5 - nstars)}</span>
+            </div>
+            <div class="net-info">
+              <span>📏 ${Math.floor(n.km).toLocaleString('fr-FR')} km</span>
+              <span class="${n.building ? 'text-gold' : 'text-dim'}">${n.building ? `🏗️ +${def.kmDay} km/j · -$${def.costDay}M/j` : `Coût: $${def.costDay}M/j`}</span>
+            </div>
+            <button class="btn-sm ${n.building ? 'btn-sell' : 'btn-invest'}" style="width:100%;margin-top:6px"
+              onclick="Engine.toggleNetwork('${n.id}')">
+              ${n.building ? '⏹️ Arrêter la construction' : '🏗️ Lancer la construction'}
+            </button>
+          </div>
+        `;
+      }).join('')}
+    `;
+  }
+
+  /* ── Carte du Monde ── */
+  function renderWorldMap() {
+    const s = Engine.get();
+    const playerCoord = MAP_COORDS[s.countryId] || [500, 250];
+
+    const markers = s.nations.map(n => {
+      const c = MAP_COORDS[n.id];
+      if (!c) return '';
+      const color = s.wars.includes(n.id) ? '#FF1744' : n.relation === 'ally' ? '#43A047' : n.relation === 'hostile' ? '#C62828' : '#90A4AE';
+      return `
+        <circle cx="${c[0]}" cy="${c[1]}" r="9" fill="${color}" stroke="#fff" stroke-width="1.5"
+          style="cursor:pointer" onclick="UI.mapSelect('${n.id}')"/>
+        <text x="${c[0]}" y="${c[1] - 14}" text-anchor="middle" font-size="13" fill="#E8E8F0"
+          style="cursor:pointer;font-family:Rajdhani" onclick="UI.mapSelect('${n.id}')">${n.flag}</text>
+      `;
+    }).join('');
+
+    const warLines = s.wars.map(wId => {
+      const c = MAP_COORDS[wId];
+      if (!c) return '';
+      return `<line x1="${playerCoord[0]}" y1="${playerCoord[1]}" x2="${c[0]}" y2="${c[1]}"
+        stroke="#FF1744" stroke-width="2" stroke-dasharray="6,4" opacity="0.8"/>`;
+    }).join('');
+
+    const allyLines = s.nations.filter(n => n.relation === 'ally' && MAP_COORDS[n.id]).map(n => {
+      const c = MAP_COORDS[n.id];
+      return `<line x1="${playerCoord[0]}" y1="${playerCoord[1]}" x2="${c[0]}" y2="${c[1]}"
+        stroke="#43A047" stroke-width="1" stroke-dasharray="3,5" opacity="0.4"/>`;
+    }).join('');
+
+    $('worldMapBody').innerHTML = `
+      <div class="map-wrap">
+        <svg viewBox="0 0 1000 500" class="world-svg" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="1000" height="500" fill="#0a1428"/>
+          ${WORLD_MAP_PATHS.map(p => `<path d="${p}" fill="#1c2e4a" stroke="#2d4a73" stroke-width="1.5"/>`).join('')}
+          ${allyLines}
+          ${warLines}
+          <circle cx="${playerCoord[0]}" cy="${playerCoord[1]}" r="12" fill="#FFD700" stroke="#fff" stroke-width="2">
+            <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite"/>
+          </circle>
+          <text x="${playerCoord[0]}" y="${playerCoord[1] - 18}" text-anchor="middle" font-size="14" fill="#FFD700"
+            font-weight="bold" style="font-family:Orbitron">${s.country.flag} VOUS</text>
+          ${markers}
+        </svg>
+      </div>
+      <div class="map-legend">
+        <span>🟡 Vous</span><span>🟢 Allié</span><span>⚪ Neutre</span><span>🔴 Hostile / Guerre</span>
+      </div>
+      <div id="mapAction"><div class="empty-msg">Touchez un pays sur la carte pour interagir.</div></div>
+    `;
+  }
+
+  function mapSelect(nationId) {
+    const s = Engine.get();
+    const n = s.nations.find(x => x.id === nationId);
+    if (!n) return;
+    const atWar = s.wars.includes(n.id);
+    $('mapAction').innerHTML = `
+      <div class="nation-card" style="margin:8px">
+        <div class="nc-flag">${n.flag}</div>
+        <div class="nc-info">
+          <div class="nc-name">${n.name}
+            ${atWar ? '<span class="war-badge">⚔️ GUERRE</span>' : n.relation === 'ally' ? '<span class="ally-badge">🤝 ALLIÉ</span>' : ''}
+          </div>
+          <div class="nc-rel ${n.relation}">PIB: ${fmt(n.gdp)} · Armée: ${n.army}/100</div>
+        </div>
+        <div class="nc-actions">
+          ${n.relation !== 'ally' && !atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','ally');UI.renderWorldMap()">🤝</button>` : ''}
+          ${!atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','trade');UI.renderWorldMap()">📦</button>` : ''}
+          ${atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','peace');UI.renderWorldMap()">🕊️</button>` :
+            n.relation !== 'ally' ? `<button class="btn-diplo btn-war" onclick="if(confirm('Déclarer la guerre à ${n.name} ?')){Engine.diplo('${n.id}','war');UI.renderWorldMap();}">⚔️</button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
   /* ── God Mode Editor ── */
   function renderEditor() {
     const s = Engine.get();
@@ -786,6 +1044,10 @@ const UI = (() => {
     renderSports();
     renderResourceMarket();
     renderEditor();
+    renderPolice();
+    renderSocial();
+    renderPopulation();
+    renderWorldMap();
   }
 
   /* ── Init ── */
@@ -798,6 +1060,7 @@ const UI = (() => {
     renderCabinet, renderEconomy, renderEnergy, renderDevelopment,
     renderDiplomacy, renderDefense, renderIntelligence, renderNews,
     renderSports, renderResources, renderResourceMarket, renderEditor,
-    cabinetChoice, resolveEvent, createResource
+    renderPolice, renderSocial, renderPopulation, renderWorldMap, renderNetworks,
+    mapSelect, cabinetChoice, resolveEvent, createResource
   };
 })();

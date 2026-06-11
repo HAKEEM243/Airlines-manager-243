@@ -262,3 +262,113 @@ const RANDOM_EVENTS = [
     ]
   }
 ];
+
+/* ═══════════ PRESIDENT SIMULATOR EXPANSION ═══════════ */
+
+const DEMOGRAPHICS = {
+  rdc:     { birthRate: 40.1, mortality: 8.5,  lifeExpM: 59, lifeExpF: 63 },
+  france:  { birthRate: 10.9, mortality: 9.5,  lifeExpM: 79, lifeExpF: 85 },
+  usa:     { birthRate: 12.0, mortality: 8.7,  lifeExpM: 76, lifeExpF: 81 },
+  chine:   { birthRate: 7.5,  mortality: 7.4,  lifeExpM: 75, lifeExpF: 80 },
+  nigeria: { birthRate: 36.5, mortality: 11.0, lifeExpM: 54, lifeExpF: 56 }
+};
+
+// Réseaux d'infrastructure (qualité en étoiles, construction au km)
+const NETWORK_DEFS = [
+  { id:'energy_line', name:"Ligne de transport d'énergie", emoji:'⚡', costDay: 5,  kmDay: 30, target: 2000 },
+  { id:'water',       name:"Conduite d'eau",               emoji:'🚰', costDay: 4,  kmDay: 25, target: 1500 },
+  { id:'gas',         name:'Conduite de gaz',              emoji:'🔥', costDay: 4,  kmDay: 25, target: 800  },
+  { id:'rail',        name:'Voie ferrée',                  emoji:'🚂', costDay: 8,  kmDay: 12, target: 400  },
+  { id:'roads',       name:'Route automobile',             emoji:'🛣️', costDay: 6,  kmDay: 20, target: 6000 },
+  { id:'cycle',       name:'Piste cyclable',               emoji:'🚴', costDay: 1,  kmDay: 50, target: 200  },
+  { id:'telecom',     name:'Réseaux de communication',     emoji:'📡', costDay: 3,  kmDay: 60, target: 1500 }
+];
+
+// km de départ par pays (réaliste)
+const NETWORK_START = {
+  rdc:     { energy_line: 12000,  water: 8000,   gas: 500,    rail: 4000,   roads: 2800,    cycle: 100,   telecom: 15000 },
+  france:  { energy_line: 105000, water: 90000,  gas: 37000,  rail: 28000,  roads: 1060000, cycle: 17000, telecom: 110000 },
+  usa:     { energy_line: 450000, water: 380000, gas: 480000, rail: 250000, roads: 6500000, cycle: 25000, telecom: 600000 },
+  chine:   { energy_line: 800000, water: 500000, gas: 98000,  rail: 150000, roads: 5200000, cycle: 80000, telecom: 900000 },
+  nigeria: { energy_line: 20000,  water: 15000,  gas: 5000,   rail: 3500,   roads: 195000,  cycle: 300,   telecom: 40000 }
+};
+
+// Statistiques criminelles (base pour 85M habitants)
+const CRIME_TYPES = [
+  { id:'hooligan',  name:'Actes de voyou',           base: 57500 },
+  { id:'cartheft',  name:'Emprunt de voitures',      base: 32200 },
+  { id:'burglary',  name:'De vols et de cambriolages', base: 529000 },
+  { id:'murder',    name:"D'assassinats",            base: 5750 },
+  { id:'serious',   name:'De crimes graves',         base: 875 },
+  { id:'accidents', name:"Nombre d'accidents",       base: 27600 }
+];
+
+// Politiques sociales (boutons +/−)
+const SOCIAL_DEFAULTS = [
+  { id:'unemploymentBenefit', name:"Le montant de l'allocation de chômage ($)", val:100, min:0,  max:2000, step:10 },
+  { id:'benefitDays',         name:"La durée de paiement de l'allocation (jours)", val:90,  min:0,  max:365,  step:10 },
+  { id:'workWeek',            name:'La durée de la semaine de travail (heures)', val:40,  min:25, max:60,   step:1 },
+  { id:'retirementAge',       name:'Âge de départ à la retraite (ans)',          val:60,  min:50, max:70,   step:1 },
+  { id:'minWage',             name:'Salaire minimum mensuel ($)',                 val:150, min:0,  max:3000, step:25 },
+  { id:'pension',             name:'Montant de la pension de retraite ($)',       val:80,  min:0,  max:2000, step:10 }
+];
+
+const CITIZEN_NAMES = [
+  'Arina','Arseniy','Roman','Joséphine','Patrice','Merveille','Dieudonné','Christelle',
+  'Junior','Gloria','Espoir','Chantal','Fiston','Nadège','Trésor','Sarah','Emmanuel',
+  'Divine','Cédric','Esther','Blaise','Rachel','Héritier','Plamedi','Grâce','Moïse'
+];
+
+const OPINION_TEMPLATES = [
+  { cond: s => s.security > 60, text: 'Merci pour la sécurité sur les routes' },
+  { cond: s => s.security > 55, text: "L'augmentation du nombre de caméras doit être une priorité" },
+  { cond: s => s.security < 40, text: "On ne se sent plus en sécurité le soir, faites quelque chose !" },
+  { cond: s => s.taxRate > 35,  text: 'Les impôts sont beaucoup trop élevés !' },
+  { cond: s => s.taxRate <= 20, text: 'La population rend grâce au Président pour les impôts bas' },
+  { cond: s => s.electrRate < 50, text: "Nous attendons toujours l'électricité dans notre quartier" },
+  { cond: s => s.electrRate >= 50, text: "Enfin du courant stable, merci au gouvernement !" },
+  { cond: s => s.inflation > 10, text: 'Les prix au marché ont encore doublé, comment vivre ?' },
+  { cond: s => s.inflation <= 5, text: 'Les prix sont stables, on respire un peu' },
+  { cond: s => s.healthRank < 120, text: "Le nouvel hôpital a sauvé la vie de ma mère, merci !" },
+  { cond: s => s.healthRank >= 150, text: 'Il faut plus de dispensaires dans les villages' },
+  { cond: s => s.literacy > 80, text: 'Mes enfants vont enfin à une bonne école' },
+  { cond: s => s.social && s.social.find(p=>p.id==='workWeek').val <= 38, text: 'La semaine de travail réduite, quelle bonne décision !' },
+  { cond: s => s.social && s.social.find(p=>p.id==='unemploymentBenefit').val >= 200, text: "L'allocation de chômage aide vraiment les familles" },
+  { cond: () => true, text: 'Quand est-ce que la fibre optique arrivera chez nous ?' },
+  { cond: () => true, text: 'Les jeunes ont besoin de stades et de terrains de sport' },
+  { cond: () => true, text: "J'ai trouvé un travail grâce aux nouveaux chantiers" },
+  { cond: () => true, text: 'Vive la République !' }
+];
+
+// Carte du monde — continents simplifiés (viewBox 0 0 1000 500)
+const WORLD_MAP_PATHS = [
+  // Amérique du Nord
+  'M40,75 L90,45 L165,35 L225,45 L250,70 L240,95 L255,110 L230,140 L210,170 L195,195 L180,175 L160,180 L135,160 L100,135 L70,110 L50,95 Z',
+  // Groenland
+  'M280,25 L330,18 L345,45 L320,65 L290,55 Z',
+  // Amérique du Sud
+  'M225,215 L265,200 L295,220 L300,255 L285,300 L265,345 L250,380 L238,345 L228,300 L215,255 Z',
+  // Europe
+  'M470,60 L530,42 L560,60 L552,85 L530,100 L500,112 L478,105 L462,85 Z',
+  // Afrique
+  'M465,140 L530,125 L570,150 L578,195 L562,240 L540,280 L520,310 L498,330 L478,300 L462,250 L452,195 L450,160 Z',
+  // Asie
+  'M565,45 L680,28 L800,40 L870,70 L880,105 L845,135 L800,160 L760,185 L720,165 L680,175 L640,140 L600,125 L572,95 L560,70 Z',
+  // Inde
+  'M690,175 L725,165 L735,205 L710,240 L692,205 Z',
+  // Asie du Sud-Est
+  'M770,200 L805,195 L815,225 L790,240 L772,225 Z',
+  // Australie
+  'M800,310 L870,298 L898,330 L878,368 L825,372 L798,340 Z',
+  // Japon
+  'M880,115 L895,105 L900,135 L885,145 Z'
+];
+
+// Positions des nations sur la carte (x,y dans viewBox 1000x500)
+const MAP_COORDS = {
+  rdc:      [564, 258], angola:  [547, 283], rwanda:  [583, 255],
+  uganda:   [589, 247], zambia:  [578, 286], tanzania:[597, 267],
+  usa:      [180, 130], china:   [780, 140], chine:   [780, 140],
+  russia:   [700, 75],  france:  [500, 95],  south_af:[555, 320],
+  nigeria:  [510, 222], brazil:  [330, 280]
+};

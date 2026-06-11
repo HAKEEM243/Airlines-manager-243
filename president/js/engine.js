@@ -48,6 +48,19 @@ const Engine = (() => {
       eduBuilt: [],
       sports: JSON.parse(JSON.stringify(SPORTS_LIST)),
       nations: JSON.parse(JSON.stringify(NATIONS)),
+      networks: NETWORK_DEFS.map(n => ({
+        id: n.id,
+        km: (NETWORK_START[countryId] || {})[n.id] ?? Math.floor(base.gdp / 100),
+        building: false
+      })),
+      social: JSON.parse(JSON.stringify(SOCIAL_DEFAULTS)),
+      policeBudget: Math.max(50, Math.floor(base.gdp * 0.004)),
+      crimes: {},
+      opinions: [],
+      birthRate: (DEMOGRAPHICS[countryId] || { birthRate: 20 }).birthRate,
+      mortality: (DEMOGRAPHICS[countryId] || { mortality: 9 }).mortality,
+      lifeExpM: (DEMOGRAPHICS[countryId] || { lifeExpM: 65 }).lifeExpM,
+      lifeExpF: (DEMOGRAPHICS[countryId] || { lifeExpF: 70 }).lifeExpF,
       resources: {},
       wars: [],
       cabinetMessages: [],
@@ -74,6 +87,8 @@ const Engine = (() => {
       }
     });
 
+    computeCrimes();
+    for (let i = 0; i < 5; i++) generateOpinion();
     recalcEconomy();
     generateInitialNews();
     scheduleCabinetMessage();
@@ -81,12 +96,20 @@ const Engine = (() => {
     return state;
   }
 
+  function getPolicy(id) {
+    const p = state.social && state.social.find(x => x.id === id);
+    return p ? p.val : 0;
+  }
+
   function recalcEconomy() {
     const s = state;
+    // Productivité liée à la semaine de travail (40h = 100%)
+    const productivity = 0.8 + getPolicy('workWeek') / 200;
+
     // Daily income = GDP * tax rate / 365
-    const taxIncome = (s.gdp * s.taxRate / 100) / 365;
-    const corpIncome = (s.gdp * 0.3 * s.corpTax / 100) / 365;
-    const vatIncome = (s.gdp * 0.5 * s.vatRate / 100) / 365;
+    const taxIncome = (s.gdp * s.taxRate / 100) / 365 * productivity;
+    const corpIncome = (s.gdp * 0.3 * s.corpTax / 100) / 365 * productivity;
+    const vatIncome = (s.gdp * 0.5 * s.vatRate / 100) / 365 * productivity;
 
     // Resource revenue
     let resRev = 0;
@@ -100,10 +123,24 @@ const Engine = (() => {
     // Expenses
     const defDaily = s.defBudget / 365;
     const intelDaily = s.intelBudget / 365;
+    const policeDaily = (s.policeBudget || 0) / 365;
     const infraDaily = s.energyCap * 0.0001;
     const socialDaily = (s.population * 0.8) / 365 * (1 + (100 - s.happiness) / 200);
+    // Coût des aides sociales : chômage + pensions + salaire minimum public
+    const welfareDaily =
+      s.population * (getPolicy('unemploymentBenefit') / 100) * (getPolicy('benefitDays') / 90) * (s.unemployment / 10) * 0.04 +
+      s.population * (getPolicy('pension') / 100) * (70 - getPolicy('retirementAge')) * 0.012 +
+      s.population * (getPolicy('minWage') / 1000) * 0.02;
+    // Réseaux en construction
+    let netDaily = 0;
+    (s.networks || []).forEach(n => {
+      if (n.building) {
+        const def = NETWORK_DEFS.find(d => d.id === n.id);
+        if (def) netDaily += def.costDay;
+      }
+    });
 
-    s.dailyExpenses = defDaily + intelDaily + infraDaily + socialDaily;
+    s.dailyExpenses = defDaily + intelDaily + policeDaily + infraDaily + socialDaily + welfareDaily + netDaily;
     s.resourceRevenue = resRev;
   }
 
@@ -131,6 +168,26 @@ const Engine = (() => {
 
     // Building progress
     updateBuildings();
+
+    // Construction des réseaux (km/jour, coût déjà dans recalc)
+    (state.networks || []).forEach(n => {
+      if (n.building) {
+        const def = NETWORK_DEFS.find(d => d.id === n.id);
+        if (def) n.km += def.kmDay;
+      }
+    });
+
+    // Démographie mensuelle
+    if (state.day % 30 === 0) {
+      state.population *= 1 + (state.birthRate - state.mortality) / 1000 / 12;
+      computeCrimes();
+    }
+
+    // Avis citoyens (tous les 10 jours)
+    if (state.day % 10 === 0) generateOpinion();
+
+    // Sauvegarde auto (tous les 30 jours)
+    if (state.day % 30 === 0) save();
 
     // Happiness drift
     const happyTarget = calcHappinessTarget();
@@ -181,6 +238,12 @@ const Engine = (() => {
     h -= s.inflation * 0.5;
     h += (s.electrRate - 50) * 0.1;
     h += (s.idh - 0.5) * 30;
+    // Politiques sociales
+    h += (getPolicy('unemploymentBenefit') - 100) * 0.01;
+    h += (44 - getPolicy('workWeek')) * 0.4;
+    h += (62 - getPolicy('retirementAge')) * 0.3;
+    h += (getPolicy('pension') - 80) * 0.01;
+    h -= s.taxRate > 35 ? (s.taxRate - 35) * 0.3 : 0;
     return Math.max(5, Math.min(95, h));
   }
 
@@ -188,9 +251,99 @@ const Engine = (() => {
     const s = state;
     let sec = 50;
     sec += (s.defBudget / s.gdp * 1000) * 0.5;
+    sec += Math.min(20, (s.policeBudget || 0) / s.population * 1.5);
     sec -= s.wars.length * 10;
     sec += (s.happiness - 40) * 0.1;
     return Math.max(5, Math.min(95, sec));
+  }
+
+  // ── Criminalité ──
+  function computeCrimes() {
+    const s = state;
+    // Efficacité policière : budget par habitant et sécurité générale
+    const policeFactor = Math.max(0.15, 1.6 - (s.policeBudget || 0) / (s.population * 6));
+    const secFactor = Math.max(0.3, 1.5 - s.security / 100);
+    s.crimes = {};
+    CRIME_TYPES.forEach(c => {
+      s.crimes[c.id] = Math.floor(c.base * (s.population / 85) * policeFactor * secFactor);
+    });
+  }
+
+  function setPoliceBudget(val) {
+    state.policeBudget = val;
+    computeCrimes();
+    recalcEconomy();
+    UI.update();
+  }
+
+  // ── Réseaux ──
+  function networkStars(n) {
+    const def = NETWORK_DEFS.find(d => d.id === n.id);
+    if (!def) return 0;
+    return Math.min(5, Math.max(0, Math.round(n.km / (state.population * def.target) * 5)));
+  }
+
+  function infraRank() {
+    const avg = (state.networks || []).reduce((a, n) => a + networkStars(n), 0) / Math.max(1, (state.networks || []).length);
+    return Math.max(1, 200 - Math.round(avg * 38));
+  }
+
+  function toggleNetwork(id) {
+    const n = state.networks.find(x => x.id === id);
+    if (!n) return;
+    n.building = !n.building;
+    const def = NETWORK_DEFS.find(d => d.id === id);
+    UI.notify(n.building ? `🏗️ Construction: ${def.name} (+${def.kmDay} km/j, -$${def.costDay}M/j)` : `⏹️ Construction arrêtée: ${def.name}`, n.building ? 'info' : 'error');
+    recalcEconomy();
+    UI.renderNetworks();
+    UI.update();
+  }
+
+  // ── Politiques sociales ──
+  function setPolicy(id, delta) {
+    const p = state.social.find(x => x.id === id);
+    if (!p) return;
+    p.val = Math.max(p.min, Math.min(p.max, p.val + delta * p.step));
+    recalcEconomy();
+    UI.renderSocial();
+    UI.update();
+  }
+
+  // ── Avis citoyens ──
+  function generateOpinion() {
+    const s = state;
+    const valid = OPINION_TEMPLATES.filter(t => { try { return t.cond(s); } catch (e) { return false; } });
+    if (!valid.length) return;
+    const t = valid[Math.floor(Math.random() * valid.length)];
+    s.opinions.unshift({
+      name: CITIZEN_NAMES[Math.floor(Math.random() * CITIZEN_NAMES.length)],
+      age: 18 + Math.floor(Math.random() * 55),
+      text: t.text
+    });
+    if (s.opinions.length > 14) s.opinions.pop();
+  }
+
+  // ── Sauvegarde ──
+  function save() {
+    try {
+      localStorage.setItem('hpl_save', JSON.stringify({ ...state, date: state.date.toISOString() }));
+    } catch (e) { /* stockage indisponible */ }
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem('hpl_save');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      data.date = new Date(data.date);
+      state = data;
+      recalcEconomy();
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function hasSave() {
+    try { return !!localStorage.getItem('hpl_save'); } catch (e) { return false; }
   }
 
   function fluctuatePrices() {
@@ -521,8 +674,11 @@ const Engine = (() => {
     buildInfra, buildHealth, buildEdu,
     investSport, diplo,
     sellResource, investResource,
-    setTax, setDefBudget,
+    setTax, setDefBudget, setPoliceBudget,
+    toggleNetwork, networkStars, infraRank,
+    setPolicy, getPolicy,
     addCustomResource,
+    save, load, hasSave,
     formatDate, formatMoney,
     get: () => state
   };

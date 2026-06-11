@@ -582,3 +582,91 @@ input[type=range]::-webkit-slider-thumb {
   :root { --phone-w: 100vw; }
   .phone-frame { border-radius: 0; border: none; box-shadow: none; }
 }
+
+/* ═══ PRESIDENT SIMULATOR EXPANSION ═══ */
+
+/* Section titles (style Président Simulator) */
+.section-title {
+  font-size: 14px; font-weight: 700; color: var(--blue-light);
+  padding: 8px 4px; letter-spacing: 0.5px;
+}
+
+/* Crime / demographic stats rows */
+.crime-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; font-size: 13px;
+  border-bottom: 1px solid rgba(37,37,80,0.5);
+}
+.crime-val {
+  font-family: 'Share Tech Mono'; font-weight: 700;
+  color: var(--green-light);
+}
+
+/* Citizen opinions */
+.opinion-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px; margin: 6px 0;
+}
+.op-avatar { font-size: 20px; opacity: 0.7; }
+.op-name { font-size: 11px; color: var(--text-dim); }
+.op-text { font-size: 13px; line-height: 1.4; margin-top: 2px; }
+
+/* Social policy steppers (style +/− Président Simulator) */
+.policy-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 12px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+}
+.policy-name { font-size: 13px; flex: 1; line-height: 1.3; }
+.stepper { display: flex; align-items: center; gap: 8px; }
+.step-btn {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; font-size: 18px; font-weight: 700;
+  cursor: pointer; color: #fff; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s;
+}
+.step-btn:active { transform: scale(0.9); }
+.step-btn.minus { background: #E65100; }
+.step-btn.plus { background: #43A047; }
+.step-val {
+  font-family: 'Share Tech Mono'; font-size: 15px; font-weight: 700;
+  color: var(--gold); min-width: 48px; text-align: center;
+}
+
+/* Network cards */
+.network-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; margin-bottom: 8px;
+}
+.network-card.net-building {
+  border-color: var(--orange);
+  animation: buildPulse 1.5s ease-in-out infinite alternate;
+}
+.net-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; font-weight: 700;
+}
+.net-info {
+  display: flex; justify-content: space-between;
+  font-size: 11px; margin-top: 6px;
+  font-family: 'Share Tech Mono';
+}
+
+/* World map */
+.map-wrap {
+  margin: 12px; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.world-svg { width: 100%; height: auto; display: block; }
+.map-legend {
+  display: flex; justify-content: center; gap: 14px;
+  font-size: 11px; color: var(--text-dim); padding: 4px 12px 8px;
+}
+
+/* Continue button */
+.btn-continue {
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
+  color: #fff;
+}

@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, gh-pages]
+    branches: [main, gh-pages, claude/hakvision-president-life-w0vql8]
   workflow_dispatch:
 
 permissions:

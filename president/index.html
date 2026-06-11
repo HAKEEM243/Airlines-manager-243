@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Hakvision President Life – World Leader</title>
+<link rel="stylesheet" href="css/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ═══════════ SPLASH ═══════════ -->
+<div id="splash">
+  <div class="splash-inner">
+    <svg class="hvlogo" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+      <!-- DRC Map silhouette -->
+      <defs>
+        <radialGradient id="mapGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#1565C0"/>
+          <stop offset="100%" stop-color="#0D47A1"/>
+        </radialGradient>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- Map body -->
+      <path d="M60,18 L100,12 L135,18 L158,32 L165,52 L160,72 L168,88 L170,110 L162,132 L155,150 L140,168 L120,178 L100,182 L78,178 L58,162 L42,142 L35,118 L38,96 L32,78 L40,58 L50,40 Z"
+        fill="url(#mapGrad)" stroke="#FFD700" stroke-width="2" filter="url(#glow)"/>
+      <!-- Yellow star -->
+      <polygon points="100,55 103,64 113,64 105,70 108,79 100,73 92,79 95,70 87,64 97,64"
+        fill="#FFD700" filter="url(#glow)"/>
+      <!-- Lightning bolts -->
+      <path d="M130,60 L120,82 L128,82 L115,108 L127,108 L110,135" stroke="#FF6F00" stroke-width="3" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+      <path d="M72,55 L80,74 L73,74 L85,98 L74,98 L90,122" stroke="#FF3D00" stroke-width="2.5" fill="none" stroke-linecap="round" filter="url(#glow)"/>
+      <!-- Raised fist -->
+      <rect x="88" y="88" width="24" height="20" rx="4" fill="#1a0a00"/>
+      <rect x="85" y="80" width="8" height="14" rx="3" fill="#1a0a00"/>
+      <rect x="93" y="77" width="8" height="14" rx="3" fill="#1a0a00"/>
+      <rect x="101" y="78" width="8" height="13" rx="3" fill="#1a0a00"/>
+      <rect x="108" y="82" width="7" height="12" rx="3" fill="#1a0a00"/>
+      <rect x="83" y="95" width="6" height="8" rx="2" fill="#1a0a00"/>
+      <!-- Blood drop -->
+      <ellipse cx="100" cy="155" rx="6" ry="9" fill="#C62828" filter="url(#glow)"/>
+      <path d="M100,146 L106,155" stroke="#C62828" stroke-width="2" fill="none"/>
+      <!-- Text -->
+      <text x="100" y="202" font-family="Orbitron,sans-serif" font-size="20" font-weight="900"
+        fill="#FFD700" text-anchor="middle" letter-spacing="3" filter="url(#glow)">HAKVISION</text>
+      <rect x="30" y="207" width="60" height="3" rx="1.5" fill="#C62828"/>
+      <rect x="110" y="207" width="60" height="3" rx="1.5" fill="#1565C0"/>
+    </svg>
+    <div class="splash-titles">
+      <div class="splash-sub">PRÉSENTE</div>
+      <div class="splash-game">PRESIDENT LIFE</div>
+      <div class="splash-world">WORLD LEADER</div>
+    </div>
+    <div class="loading-wrap">
+      <div class="loading-bar"><div class="loading-fill" id="loadFill"></div></div>
+      <div class="loading-pct" id="loadPct">0%</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SETUP ═══════════ -->
+<div id="setup" class="hidden">
+  <div class="setup-card">
+    <div class="setup-logo-sm">
+      <svg viewBox="0 0 200 230" width="80" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60,18 L100,12 L135,18 L158,32 L165,52 L160,72 L168,88 L170,110 L162,132 L155,150 L140,168 L120,178 L100,182 L78,178 L58,162 L42,142 L35,118 L38,96 L32,78 L40,58 L50,40 Z" fill="#1565C0" stroke="#FFD700" stroke-width="2"/>
+        <polygon points="100,55 103,64 113,64 105,70 108,79 100,73 92,79 95,70 87,64 97,64" fill="#FFD700"/>
+        <text x="100" y="212" font-family="Orbitron,sans-serif" font-size="18" font-weight="900" fill="#FFD700" text-anchor="middle" letter-spacing="2">HAKVISION</text>
+      </svg>
+    </div>
+    <h2>NOUVELLE PARTIE</h2>
+    <div class="form-group">
+      <label>Votre Nom</label>
+      <input id="presName" type="text" placeholder="Ex: Joseph Kabila" maxlength="30"/>
+    </div>
+    <div class="form-group">
+      <label>Choisir un Pays</label>
+      <div class="country-grid" id="countryGrid"></div>
+    </div>
+    <div class="form-group">
+      <label>Difficulté</label>
+      <div class="diff-row">
+        <button class="diff-btn active" data-diff="easy">Facile</button>
+        <button class="diff-btn" data-diff="normal">Normal</button>
+        <button class="diff-btn" data-diff="hard">Difficile</button>
+      </div>
+    </div>
+    <button class="btn-start" id="btnStart">▶ PRENDRE LE POUVOIR</button>
+  </div>
+</div>
+
+<!-- ═══════════ GAME ═══════════ -->
+<div id="game" class="hidden">
+  <div class="phone-frame">
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="sb-left">
+        <span id="sbDate">01 Jan 2025</span>
+      </div>
+      <div class="sb-center">
+        <span class="sb-stat" id="sbMoney">💰 $0</span>
+        <span class="sb-stat" id="sbApproval">👥 0%</span>
+        <span class="sb-stat" id="sbPop">🏙 0M</span>
+      </div>
+      <div class="sb-right">
+        <button class="speed-btn" id="btnPause" title="Pause">⏸</button>
+        <button class="speed-btn active" id="btn1x" title="x1">1x</button>
+        <button class="speed-btn" id="btn2x" title="x2">2x</button>
+        <button class="speed-btn" id="btn5x" title="x5">5x</button>
+      </div>
+    </div>
+
+    <!-- Country Header -->
+    <div class="country-header">
+      <div class="ch-flag" id="chFlag">🇨🇩</div>
+      <div class="ch-info">
+        <div class="ch-country" id="chCountry">RÉPUBLIQUE DÉMOCRATIQUE DU CONGO</div>
+        <div class="ch-president" id="chPresident">Président: —</div>
+      </div>
+      <div class="ch-level">
+        <div class="ch-lvl-label">MANDATURE</div>
+        <div class="ch-lvl-val" id="chMandat">1</div>
+      </div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div class="alert-banner hidden" id="alertBanner">
+      <span id="alertText"></span>
+      <button id="alertClose">✕</button>
+    </div>
+
+    <!-- Screen (panels) -->
+    <div class="screen" id="screen">
+
+      <!-- HOME -->
+      <div class="panel active" id="panel-home">
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-label">TRÉSOR</div>
+            <div class="kpi-val green" id="kpiTreasury">$0B</div>
+            <div class="kpi-delta" id="kpiTreasuryDelta">+0/j</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">PIB</div>
+            <div class="kpi-val" id="kpiGDP">$0B</div>
+            <div class="kpi-delta" id="kpiGDPDelta">▲ 0%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">BONHEUR</div>
+            <div class="kpi-val" id="kpiHappy">0%</div>
+            <div class="meter-bar"><div class="meter-fill happy-fill" id="happyBar"></div></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">SÉCURITÉ</div>
+            <div class="kpi-val" id="kpiSec">0%</div>
+            <div class="meter-bar"><div class="meter-fill sec-fill" id="secBar"></div></div>
+          </div>
+        </div>
+        <div class="app-grid">
+          <div class="app-icon" data-panel="cabinet"><div class="app-emoji">📩</div><div class="app-label">Cabinet</div><div class="app-badge hidden" id="badge-cabinet">0</div></div>
+          <div class="app-icon" data-panel="economy"><div class="app-emoji">💰</div><div class="app-label">Économie</div></div>
+          <div class="app-icon" data-panel="energy"><div class="app-emoji">⚡</div><div class="app-label">Énergie</div></div>
+          <div class="app-icon" data-panel="development"><div class="app-emoji">🎓</div><div class="app-label">Éducation</div></div>
+          <div class="app-icon" data-panel="diplomacy"><div class="app-emoji">🌍</div><div class="app-label">Diplomatie</div></div>
+          <div class="app-icon" data-panel="defense"><div class="app-emoji">⚔️</div><div class="app-label">Défense</div></div>
+          <div class="app-icon" data-panel="intelligence"><div class="app-emoji">🕵️</div><div class="app-label">Renseignement</div></div>
+          <div class="app-icon" data-panel="news"><div class="app-emoji">📰</div><div class="app-label">Actualités</div><div class="app-badge hidden" id="badge-news">0</div></div>
+          <div class="app-icon" data-panel="sports"><div class="app-emoji">🏆</div><div class="app-label">Sports</div></div>
+          <div class="app-icon" data-panel="resources"><div class="app-emoji">⛏️</div><div class="app-label">Ressources</div></div>
+          <div class="app-icon" data-panel="editor"><div class="app-emoji">✏️</div><div class="app-label">God Mode</div></div>
+          <div class="app-icon" data-panel="diplomacy"><div class="app-emoji">🤝</div><div class="app-label">Alliances</div></div>
+        </div>
+        <div class="ticker-wrap"><div class="ticker" id="ticker">Chargement des actualités mondiales...</div></div>
+      </div>
+
+      <!-- CABINET -->
+      <div class="panel hidden" id="panel-cabinet">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>📩 CABINET PRÉSIDENTIEL</h3></div>
+        <div class="panel-body" id="cabinetBody">
+          <div class="empty-msg">Aucun message urgent pour l'instant.</div>
+        </div>
+      </div>
+
+      <!-- ECONOMY -->
+      <div class="panel hidden" id="panel-economy">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>💰 ÉCONOMIE & RESSOURCES</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="eco-overview">Vue d'ensemble</button>
+          <button class="tab" data-tab="eco-taxes">Fiscalité</button>
+          <button class="tab" data-tab="eco-resources">Ressources</button>
+          <button class="tab" data-tab="eco-trade">Commerce</button>
+        </div>
+        <div class="tab-content active" id="eco-overview">
+          <div class="stat-grid" id="ecoStats"></div>
+        </div>
+        <div class="tab-content hidden" id="eco-taxes">
+          <div id="taxSliders"></div>
+        </div>
+        <div class="tab-content hidden" id="eco-resources">
+          <div id="resourceCards"></div>
+        </div>
+        <div class="tab-content hidden" id="eco-trade">
+          <div id="tradePanel"></div>
+        </div>
+      </div>
+
+      <!-- ENERGY -->
+      <div class="panel hidden" id="panel-energy">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>⚡ ÉNERGIE & INFRASTRUCTURES</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="infra-energy">Énergie</button>
+          <button class="tab" data-tab="infra-road">Transport</button>
+          <button class="tab" data-tab="infra-build">Construction</button>
+        </div>
+        <div class="tab-content active" id="infra-energy">
+          <div class="stat-row"><span>⚡ Capacité installée</span><span id="energyCap">0 MW</span></div>
+          <div class="stat-row"><span>🔌 Taux d'électrification</span><span id="electrRate">0%</span></div>
+          <div class="stat-row"><span>💧 Hydraulique</span><span id="hydroPct">0%</span></div>
+          <div id="energyProjects"></div>
+        </div>
+        <div class="tab-content hidden" id="infra-road">
+          <div class="stat-row"><span>🛣️ Routes goudronnées</span><span id="roadKm">0 km</span></div>
+          <div class="stat-row"><span>✈️ Aéroports internationaux</span><span id="airports">0</span></div>
+          <div id="roadProjects"></div>
+        </div>
+        <div class="tab-content hidden" id="infra-build">
+          <div id="infraBuild"></div>
+        </div>
+      </div>
+
+      <!-- DEVELOPMENT -->
+      <div class="panel hidden" id="panel-development">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🎓 ÉDUCATION & SANTÉ</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="dev-edu">Éducation</button>
+          <button class="tab" data-tab="dev-health">Santé</button>
+        </div>
+        <div class="tab-content active" id="dev-edu">
+          <div class="stat-row"><span>📚 Taux d'alphabétisation</span><span id="literacy">0%</span></div>
+          <div class="stat-row"><span>🎓 IDH</span><span id="idh">0.000</span></div>
+          <div class="build-grid" id="eduBuild"></div>
+        </div>
+        <div class="tab-content hidden" id="dev-health">
+          <div class="stat-row"><span>❤️ Espérance de vie</span><span id="lifeExp">0 ans</span></div>
+          <div class="stat-row"><span>🏥 Rang mondial santé</span><span id="healthRank">0</span></div>
+          <div class="build-grid" id="healthBuild"></div>
+        </div>
+      </div>
+
+      <!-- DIPLOMACY -->
+      <div class="panel hidden" id="panel-diplomacy">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🌍 DIPLOMATIE</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="dip-world">Nations</button>
+          <button class="tab" data-tab="dip-alliances">Alliances</button>
+          <button class="tab" data-tab="dip-trade">Accords</button>
+        </div>
+        <div class="tab-content active" id="dip-world">
+          <div id="nationsList"></div>
+        </div>
+        <div class="tab-content hidden" id="dip-alliances">
+          <div id="alliancesList"></div>
+        </div>
+        <div class="tab-content hidden" id="dip-trade">
+          <div id="tradeAgreements"></div>
+        </div>
+      </div>
+
+      <!-- DEFENSE -->
+      <div class="panel hidden" id="panel-defense">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>⚔️ DÉFENSE NATIONALE</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="def-budget">Budget</button>
+          <button class="tab" data-tab="def-army">Armée</button>
+          <button class="tab" data-tab="def-war">Conflits</button>
+        </div>
+        <div class="tab-content active" id="def-budget">
+          <div id="defBudget"></div>
+        </div>
+        <div class="tab-content hidden" id="def-army">
+          <div id="defArmy"></div>
+        </div>
+        <div class="tab-content hidden" id="def-war">
+          <div id="defWar"></div>
+        </div>
+      </div>
+
+      <!-- INTELLIGENCE -->
+      <div class="panel hidden" id="panel-intelligence">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🕵️ RENSEIGNEMENT</h3></div>
+        <div id="intelBody"></div>
+      </div>
+
+      <!-- NEWS -->
+      <div class="panel hidden" id="panel-news">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>📰 ACTUALITÉS</h3></div>
+        <div class="news-layout">
+          <div class="news-col">
+            <h4>🇨🇩 Nationales</h4>
+            <div id="newsLocal"></div>
+          </div>
+          <div class="news-col">
+            <h4>🌍 Internationales</h4>
+            <div id="newsWorld"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPORTS -->
+      <div class="panel hidden" id="panel-sports">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>🏆 SPORTS NATIONAUX</h3></div>
+        <div class="tabs">
+          <button class="tab active" data-tab="sp-rank">Classements</button>
+          <button class="tab" data-tab="sp-manage">Gestion</button>
+          <button class="tab" data-tab="sp-results">Résultats</button>
+        </div>
+        <div class="tab-content active" id="sp-rank">
+          <div id="sportsRank"></div>
+        </div>
+        <div class="tab-content hidden" id="sp-manage">
+          <div id="sportsManage"></div>
+        </div>
+        <div class="tab-content hidden" id="sp-results">
+          <div id="sportsResults"></div>
+        </div>
+      </div>
+
+      <!-- RESOURCES (RDC Special) -->
+      <div class="panel hidden" id="panel-resources">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>⛏️ HUB MONDIAL DES RESSOURCES</h3></div>
+        <div class="rdc-badge">🇨🇩 Module Exclusif RDC</div>
+        <div id="resourceMarket"></div>
+      </div>
+
+      <!-- GOD MODE EDITOR -->
+      <div class="panel hidden" id="panel-editor">
+        <div class="panel-header"><button class="back-btn">← Retour</button><h3>✏️ ÉDITEUR DE RESSOURCES</h3></div>
+        <div class="godmode-warn">⚠️ Mode God — Modifications directes de la base de données</div>
+        <div id="editorBody"></div>
+      </div>
+
+    </div><!-- /screen -->
+
+    <!-- Home Button -->
+    <div class="home-button" id="homeBtn">⬤</div>
+
+    <!-- Event Modal -->
+    <div class="event-overlay hidden" id="eventOverlay">
+      <div class="event-modal">
+        <div class="event-icon" id="evIcon">⚠️</div>
+        <div class="event-title" id="evTitle">Événement</div>
+        <div class="event-desc" id="evDesc"></div>
+        <div class="event-choices" id="evChoices"></div>
+      </div>
+    </div>
+
+  </div><!-- /phone-frame -->
+</div><!-- /game -->
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

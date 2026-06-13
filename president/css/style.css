@@ -670,3 +670,104 @@ input[type=range]::-webkit-slider-thumb {
   background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
   color: #fff;
 }
+
+/* ═══ PRESIDENT SIMULATOR V2 ═══ */
+.date-banner {
+  background: linear-gradient(90deg, rgba(255,215,0,0.12), rgba(21,101,192,0.12));
+  border-bottom: 1px solid var(--border);
+  text-align: center; padding: 6px; font-family: 'Share Tech Mono';
+  font-size: 13px; color: var(--gold); letter-spacing: 1px; flex-shrink: 0;
+}
+.election-strip {
+  margin: 0 12px 8px; padding: 8px 12px; font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-dim); text-align: center;
+}
+.election-strip b { color: var(--gold); }
+
+/* App grid scroll */
+#panel-home { overflow-y: auto; }
+.app-grid { grid-template-columns: repeat(4, 1fr); }
+
+.hint { color: var(--text-dim); font-size: 12px; padding: 12px; line-height: 1.5; }
+.sec-h { font-size: 12px; color: var(--gold); letter-spacing: 1px; margin: 14px 12px 8px; }
+
+/* Forms */
+.form-block { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.form-block label { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-top: 6px; }
+.form-block input[type=text], .form-block select {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; color: var(--text); font-family: 'Rajdhani'; font-size: 15px; outline: none;
+}
+.form-block input:focus, .form-block select:focus { border-color: var(--gold); }
+.co-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin: 8px 0; }
+
+/* Company / contract / army / embassy cards */
+.company-card, .contract-card, .army-card, .embassy-card, .minister-card, .sport-card, .un-card, .build-card-wide, .map-info-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; margin: 8px;
+}
+.company-card.closed { opacity: 0.55; border-color: var(--red); }
+.cmp-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 700; }
+.cmp-line { font-size: 11px; color: var(--text-dim); margin: 4px 0; }
+.cmp-stats { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; font-family: 'Share Tech Mono'; color: var(--gold); margin-top: 4px; }
+
+/* Ministers */
+.min-head { font-size: 13px; font-weight: 700; }
+.min-name { font-size: 15px; color: var(--gold); margin: 2px 0 8px; }
+.min-stat { display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; }
+
+/* Embassy */
+.emb-tags { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; font-weight: 700; }
+.tag.green { background: rgba(46,125,50,0.2); color: var(--green-light); }
+.tag.blue { background: rgba(21,101,192,0.2); color: var(--blue-light); }
+.emb-visa { margin: 8px 0; }
+.emb-lbl { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+.visa-btn {
+  font-size: 10px; padding: 4px 8px; margin: 2px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer;
+}
+.visa-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(255,215,0,0.08); }
+
+/* Maps */
+.map-controls { display: flex; gap: 6px; align-items: center; padding: 8px 12px; }
+.map-btn {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--gold); font-size: 16px; cursor: pointer;
+}
+.map-btn:active { transform: scale(0.92); }
+.map-hint { font-size: 11px; color: var(--text-dim); margin-left: auto; }
+.map-wrap { margin: 0 12px 8px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.world-svg { width: 100%; height: auto; display: block; transition: transform 0.2s; transform-origin: center; }
+.map-legend { display: flex; justify-content: center; gap: 12px; font-size: 11px; color: var(--text-dim); padding: 0 12px 8px; }
+.map-info-card.you { border-color: var(--gold); }
+.mic-head { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.badge-you { background: var(--gold); color: #000; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+
+/* Social feed */
+.social-head { padding: 12px; font-size: 13px; color: var(--gold); letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+.tweet { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin: 8px; border-left: 3px solid var(--text-dim); }
+.tweet.pos { border-left-color: var(--green-light); }
+.tweet.neg { border-left-color: var(--red); }
+.tw-top { display: flex; justify-content: space-between; }
+.tw-user { font-weight: 700; color: var(--blue-light); font-size: 13px; }
+.tw-date { font-size: 10px; color: var(--text-dim); font-family: 'Share Tech Mono'; }
+.tw-text { font-size: 13px; line-height: 1.5; margin: 6px 0; }
+.tw-meta { font-size: 11px; color: var(--text-dim); }
+
+/* UN */
+.un-card { border-left: 3px solid var(--blue); }
+.un-title { font-size: 14px; font-weight: 700; color: var(--gold); }
+.un-desc { font-size: 12px; color: var(--text); margin: 6px 0; line-height: 1.5; }
+.un-voted { font-size: 12px; color: var(--green-light); margin-top: 6px; }
+
+/* Election hero */
+.election-hero { text-align: center; padding: 20px; background: linear-gradient(135deg, rgba(21,101,192,0.15), rgba(255,215,0,0.1)); border-radius: 12px; margin: 12px; border: 1px solid var(--gold); }
+.eh-icon { font-size: 40px; }
+.eh-title { font-family: 'Orbitron'; font-size: 14px; color: var(--gold); letter-spacing: 2px; margin-top: 8px; }
+.eh-date { font-family: 'Orbitron'; font-size: 20px; font-weight: 900; color: #fff; margin: 6px 0; }
+.eh-sub { font-size: 12px; color: var(--text-dim); }
+
+.build-card-wide.built { border-color: var(--green-light); }
+.build-card-wide.building { border-color: var(--orange); }

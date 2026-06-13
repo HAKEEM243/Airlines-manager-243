@@ -1,1066 +1,587 @@
 'use strict';
 
+/* ═══════════════════════════════════════════════════════════
+   HAKVISION PRESIDENT LIFE — INTERFACE
+═══════════════════════════════════════════════════════════ */
+
 const UI = (() => {
-
-  /* ── helpers ── */
   const $ = id => document.getElementById(id);
-  const qs = sel => document.querySelector(sel);
-
-  function fmt(n) { return Engine.formatMoney(n); }
-  function fmtDate(d) { return Engine.formatDate(d); }
-
-  function stars(n) {
-    return '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n));
-  }
-
-  function rankColor(r) {
-    if (r <= 30) return 'rank-good';
-    if (r <= 70) return 'rank-mid';
-    return 'rank-bad';
-  }
-
-  /* ── Splash ── */
-  function runSplash() {
-    let pct = 0;
-    const fill = $('loadFill');
-    const pctEl = $('loadPct');
-    const iv = setInterval(() => {
-      pct += Math.random() * 12 + 3;
-      if (pct >= 100) { pct = 100; clearInterval(iv); setTimeout(showSetup, 400); }
-      fill.style.width = pct + '%';
-      pctEl.textContent = Math.floor(pct) + '%';
-    }, 120);
-  }
-
-  function showSetup() {
-    $('splash').classList.add('hidden');
-    $('setup').classList.remove('hidden');
-    renderCountryGrid();
-    bindSetup();
-  }
-
-  /* ── Setup ── */
+  const E = Engine;
   let selectedCountry = 'rdc';
   let selectedDiff = 'normal';
 
+  function money(n){ return E.fmtMoney(n); }
+  function stars(n){ n=Math.round(n); return '★'.repeat(Math.max(0,Math.min(5,n)))+'☆'.repeat(Math.max(0,5-n)); }
+  function bar(pct, cls){ return `<div class="meter-bar"><div class="meter-fill ${cls||''}" style="width:${Math.max(0,Math.min(100,pct))}%"></div></div>`; }
+
+  /* ───────── SPLASH ───────── */
+  function runSplash() {
+    let p=0; const fill=$('loadFill'), pct=$('loadPct');
+    const iv=setInterval(()=>{ p+=Math.random()*14+4; if(p>=100){p=100;clearInterval(iv);setTimeout(showSetup,400);} fill.style.width=p+'%'; pct.textContent=Math.floor(p)+'%'; },110);
+  }
+  function showSetup(){ $('splash').classList.add('hidden'); $('setup').classList.remove('hidden'); renderCountryGrid(); bindSetup(); }
+
   function renderCountryGrid() {
-    const grid = $('countryGrid');
-    grid.innerHTML = COUNTRIES.map(c => `
-      <div class="country-card ${c.featured ? 'featured' : ''} ${c.id === selectedCountry ? 'selected' : ''}"
-           data-id="${c.id}">
+    $('countryGrid').innerHTML = COUNTRIES.map(c=>`
+      <div class="country-card ${c.featured?'featured':''} ${c.id===selectedCountry?'selected':''}" data-id="${c.id}">
         <div class="cc-flag">${c.flag}</div>
-        <div class="cc-info">
-          <div class="cc-name">${c.name}</div>
-          <div class="cc-gdp">PIB: ${fmt(c.gdp)}</div>
-        </div>
-      </div>
-    `).join('');
-
-    grid.querySelectorAll('.country-card').forEach(card => {
-      card.addEventListener('click', () => {
-        selectedCountry = card.dataset.id;
-        grid.querySelectorAll('.country-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-      });
-    });
+        <div class="cc-info"><div class="cc-name">${c.name}</div><div class="cc-gdp">PIB: ${money(c.gdp)}</div></div>
+      </div>`).join('');
+    document.querySelectorAll('.country-card').forEach(card=>card.addEventListener('click',()=>{
+      selectedCountry=card.dataset.id;
+      document.querySelectorAll('.country-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+    }));
   }
-
   function bindSetup() {
-    document.querySelectorAll('.diff-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        selectedDiff = btn.dataset.diff;
-      });
-    });
-
-    $('btnStart').addEventListener('click', () => {
-      const name = ($('presName').value || 'Le Président').trim();
-      startGame(selectedCountry, name, selectedDiff);
-    });
-
-    // Bouton "Continuer" si une sauvegarde existe
-    if (Engine.hasSave()) {
-      const btn = $('btnContinue');
-      btn.classList.remove('hidden');
-      btn.addEventListener('click', () => {
-        if (Engine.load()) {
-          $('setup').classList.add('hidden');
-          $('game').classList.remove('hidden');
-          bindGame();
-          renderAll();
-          Engine.startTicker();
-          Engine.setSpeed(1);
-          setSpeedUI(1);
-        }
-      });
-    }
+    document.querySelectorAll('.diff-btn').forEach(b=>b.addEventListener('click',()=>{
+      document.querySelectorAll('.diff-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); selectedDiff=b.dataset.diff;
+    }));
+    $('btnStart').addEventListener('click',()=>{ const n=($('presName').value||'Le Président').trim(); start(selectedCountry,n,selectedDiff,false); });
+    if (E.hasSave()) { const b=$('btnContinue'); b.classList.remove('hidden'); b.addEventListener('click',()=>start(null,null,null,true)); }
   }
 
-  /* ── Game Start ── */
-  function startGame(countryId, name, diff) {
-    $('setup').classList.add('hidden');
-    $('game').classList.remove('hidden');
-    Engine.init(countryId, name, diff);
-    bindGame();
-    renderAll();
-    Engine.startTicker();
-    Engine.setSpeed(1);
-    setSpeedUI(1);
+  function start(country,name,diff,fromSave) {
+    $('setup').classList.add('hidden'); $('game').classList.remove('hidden');
+    if (fromSave) { if(!E.load()){ alert('Sauvegarde introuvable'); return; } }
+    else E.init(country,name,diff);
+    bindGame(); renderAll(); E.startTicker(); E.setSpeed(1); setSpeedUI(1);
   }
 
-  /* ── Speed Controls ── */
-  function setSpeedUI(s) {
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-    if (s === 0) $('btnPause').classList.add('active');
-    else if (s === 1) $('btn1x').classList.add('active');
-    else if (s === 2) $('btn2x').classList.add('active');
-    else if (s === 5) $('btn5x').classList.add('active');
-  }
+  /* ───────── NAV ───────── */
+  function setSpeedUI(s){ document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active')); ({0:'btnPause',1:'btn1x',2:'btn2x',5:'btn5x'}[s]&&$(({0:'btnPause',1:'btn1x',2:'btn2x',5:'btn5x'})[s]).classList.add('active')); }
 
-  /* ── Panel Navigation ── */
-  function showPanel(id) {
-    const panels = document.querySelectorAll('.panel');
-    panels.forEach(p => {
-      if (p.id === 'panel-home') {
-        p.classList.add('active');
-      } else {
-        p.classList.remove('active');
-        p.classList.add('hidden');
-      }
+  function show(id) {
+    document.querySelectorAll('.panel').forEach(p=>{
+      if(p.id==='panel-home') p.classList.add('active');
+      else { p.classList.remove('active'); p.classList.add('hidden'); }
     });
-    if (id !== 'home') {
-      const target = $(`panel-${id}`);
-      if (target) {
-        target.classList.remove('hidden');
-        setTimeout(() => target.classList.add('active'), 10);
-      }
-    }
-    // Re-render on open
-    if (id === 'cabinet') renderCabinet();
-    if (id === 'economy') renderEconomy();
-    if (id === 'energy') renderEnergy();
-    if (id === 'development') renderDevelopment();
-    if (id === 'diplomacy') renderDiplomacy();
-    if (id === 'defense') renderDefense();
-    if (id === 'intelligence') renderIntelligence();
-    if (id === 'news') renderNews();
-    if (id === 'sports') renderSports();
-    if (id === 'resources') renderResourceMarket();
-    if (id === 'editor') renderEditor();
-    if (id === 'police') renderPolice();
-    if (id === 'social') renderSocial();
-    if (id === 'population') renderPopulation();
-    if (id === 'worldmap') renderWorldMap();
+    if(id!=='home'){ const t=$('panel-'+id); if(t){ t.classList.remove('hidden'); setTimeout(()=>t.classList.add('active'),10); } }
+    const r={cabinet:renderCabinet,economy:renderEconomy,resources:renderResources,companies:renderCompanies,
+      trade:renderTrade,worldmap:renderWorldMap,national:renderNational,embassies:renderEmbassies,
+      ministers:renderMinisters,army:renderArmy,infra:renderInfra,sports:renderSports,
+      elections:renderElections,social:renderSocial,news:renderNews,un:renderUN};
+    if(r[id]) r[id]();
   }
 
   function bindGame() {
-    // App icons
-    document.querySelectorAll('.app-icon').forEach(icon => {
-      if (icon.dataset.panel) icon.addEventListener('click', () => showPanel(icon.dataset.panel));
-    });
-
-    // Save button
-    const saveBtn = $('appSave');
-    if (saveBtn) saveBtn.addEventListener('click', () => {
-      Engine.save();
-      notify('💾 Partie sauvegardée !', 'success');
-    });
-
-    // Back buttons
-    document.querySelectorAll('.back-btn').forEach(btn => {
-      btn.addEventListener('click', () => showPanel('home'));
-    });
-
-    // Home button
-    $('homeBtn').addEventListener('click', () => showPanel('home'));
-
-    // Speed buttons
-    $('btnPause').addEventListener('click', () => { Engine.setSpeed(0); setSpeedUI(0); });
-    $('btn1x').addEventListener('click', () => { Engine.setSpeed(1); setSpeedUI(1); });
-    $('btn2x').addEventListener('click', () => { Engine.setSpeed(2); setSpeedUI(2); });
-    $('btn5x').addEventListener('click', () => { Engine.setSpeed(5); setSpeedUI(5); });
-
-    // Alert close
-    $('alertClose').addEventListener('click', () => $('alertBanner').classList.add('hidden'));
-
-    // Tab switching (delegated)
-    document.querySelectorAll('.tabs').forEach(tabBar => {
-      tabBar.querySelectorAll('.tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          const panel = tabBar.closest('.panel');
-          panel.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-          panel.querySelectorAll('.tab-content').forEach(tc => tc.classList.add('hidden'));
-          tab.classList.add('active');
-          const target = panel.querySelector(`#${tab.dataset.tab}`);
-          if (target) target.classList.remove('hidden');
-        });
-      });
+    document.querySelectorAll('.app-icon').forEach(i=>{ if(i.dataset.panel) i.addEventListener('click',()=>show(i.dataset.panel)); });
+    document.querySelectorAll('.back-btn').forEach(b=>b.addEventListener('click',()=>show('home')));
+    $('homeBtn').addEventListener('click',()=>show('home'));
+    $('btnPause').addEventListener('click',()=>{E.setSpeed(0);setSpeedUI(0);});
+    $('btn1x').addEventListener('click',()=>{E.setSpeed(1);setSpeedUI(1);});
+    $('btn2x').addEventListener('click',()=>{E.setSpeed(2);setSpeedUI(2);});
+    $('btn5x').addEventListener('click',()=>{E.setSpeed(5);setSpeedUI(5);});
+    $('alertClose').addEventListener('click',()=>$('alertBanner').classList.add('hidden'));
+    // tabs
+    document.querySelectorAll('.tabs').forEach(bar=>{
+      bar.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{
+        const panel=bar.closest('.panel');
+        panel.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+        panel.querySelectorAll('.tab-content').forEach(c=>c.classList.add('hidden'));
+        tab.classList.add('active');
+        const tgt=panel.querySelector('#'+tab.dataset.tab); if(tgt) tgt.classList.remove('hidden');
+      }));
     });
   }
 
-  /* ── Master Update ── */
-  function update() {
-    const s = Engine.get();
-    if (!s) return;
-
-    // Status bar
-    $('sbDate').textContent = fmtDate(s.date);
-    $('sbMoney').textContent = `💰 ${fmt(s.treasury)}`;
-    $('sbApproval').style.color = s.happiness > 50 ? '#43A047' : s.happiness > 30 ? '#FFD700' : '#C62828';
-    $('sbApproval').textContent = `👥 ${s.happiness.toFixed(0)}%`;
-    $('sbPop').textContent = `🏙 ${s.population.toFixed(0)}M`;
-
-    // Country header
+  /* ───────── REFRESH (status + home) ───────── */
+  function refresh() {
+    const s=E.get(); if(!s) return;
+    $('sbDate').textContent = E.fmtDate(s.date);
+    $('sbMoney').textContent = '💰 '+money(s.treasury);
+    $('sbApproval').textContent = '👥 '+s.happiness.toFixed(0)+'%';
+    $('sbApproval').style.color = s.happiness>50?'#43A047':s.happiness>30?'#FFD700':'#C62828';
+    $('dateBanner').textContent = '📅 '+E.fmtDateLong(s.date);
     $('chCountry').textContent = s.country.name.toUpperCase();
-    $('chPresident').textContent = `Président: ${s.presidentName}`;
+    $('chPresident').textContent = 'Président: '+s.presidentName;
     $('chFlag').textContent = s.country.flag;
     $('chMandat').textContent = s.mandat;
 
-    // KPI cards
-    $('kpiTreasury').textContent = fmt(s.treasury);
-    $('kpiTreasury').className = 'kpi-val ' + (s.treasury >= 0 ? 'green' : 'red');
-    const netDaily = s.dailyIncome - s.dailyExpenses;
-    $('kpiTreasuryDelta').textContent = `${netDaily >= 0 ? '+' : ''}${netDaily.toFixed(0)}M/j`;
-    $('kpiGDP').textContent = fmt(s.gdp);
-    $('kpiGDPDelta').textContent = `▲ ${s.gdpGrowth.toFixed(1)}%/an`;
-    $('kpiHappy').textContent = `${s.happiness.toFixed(0)}%`;
-    $('happyBar').style.width = s.happiness + '%';
-    $('kpiSec').textContent = `${s.security.toFixed(0)}%`;
-    $('secBar').style.width = s.security + '%';
+    $('kpiTreasury').textContent = money(s.treasury);
+    $('kpiTreasury').className='kpi-val '+(s.treasury>=0?'green':'red');
+    const net=s.dailyIncome-s.dailyExpenses;
+    $('kpiTreasuryDelta').textContent = (net>=0?'+':'')+net.toFixed(0)+'M/j';
+    $('kpiTreasuryDelta').style.color = net>=0?'#43A047':'#C62828';
+    $('kpiGDP').textContent = money(s.gdp);
+    $('kpiGDPDelta').textContent = '▲ '+s.gdpGrowth.toFixed(1)+'%/an';
+    $('kpiHappy').textContent = s.happiness.toFixed(0)+'%';
+    $('happyBar').style.width = s.happiness+'%';
+    $('kpiSec').textContent = s.security.toFixed(0)+'%';
+    $('secBar').style.width = s.security+'%';
 
-    // Ticker
-    updateTicker(s);
+    // élection strip
+    if (s.electionDate) {
+      const days = Math.max(0, Math.ceil((s.electionDate - s.date)/86400000));
+      $('electionStrip').innerHTML = `🗳️ Prochaine élection : <b>${E.fmtDate(s.electionDate)}</b> &nbsp;·&nbsp; dans ${days.toLocaleString('fr-FR')} jours`;
+    } else $('electionStrip').innerHTML = '🏛️ Régime sans élection présidentielle';
 
-    // Alert if happiness critical
-    if (s.happiness < 25) {
-      $('alertBanner').classList.remove('hidden');
-      $('alertText').textContent = `⚠️ Alerte : Taux d'approbation critique (${s.happiness.toFixed(0)}%) — Risque de manifestations !`;
-    }
+    // ticker
+    const t=[`💰 ${money(s.treasury)}`,`📈 PIB ${money(s.gdp)}`,`😊 ${s.happiness.toFixed(0)}%`,`🔒 ${s.security.toFixed(0)}%`,
+      `💼 Chômage ${s.unemployment.toFixed(1)}%`,`🏢 ${s.companies.filter(c=>c.active).length} entreprises`,
+      `⚔️ Puissance militaire ${E.totalArmyPower().toLocaleString('fr-FR')}`,
+      ...(s.socialFeed[0]?[`📱 ${s.socialFeed[0].text.substring(0,60)}...`]:[]),
+      ...(s.wars.length?[`⚔️ EN GUERRE (${s.wars.length})`]:[])];
+    $('ticker').textContent = t.join('   ·   ');
+
+    if (s.happiness<25 && !s.gameOver) { $('alertBanner').classList.remove('hidden'); $('alertText').textContent=`⚠️ Popularité critique (${s.happiness.toFixed(0)}%) — Risque de révolution !`; $('alertBanner').style.background=''; }
   }
 
-  function updateTicker(s) {
-    const items = [
-      `💰 Trésor: ${fmt(s.treasury)}`,
-      `📈 PIB: ${fmt(s.gdp)}`,
-      `😊 Bonheur: ${s.happiness.toFixed(0)}%`,
-      `🔒 Sécurité: ${s.security.toFixed(0)}%`,
-      `⚡ Énergie: ${s.energyCap.toLocaleString()} MW`,
-      ...(s.newsLocal[0] ? [`📰 ${s.newsLocal[0].text.substring(0, 80)}...`] : []),
-      ...(s.wars.length ? [`⚔️ En guerre contre: ${s.wars.join(', ')}`] : []),
-      `📅 Élections dans ${s.daysToElection} jours`
-    ];
-    $('ticker').textContent = items.join('   ·   ');
-  }
-
-  /* ── Cabinet ── */
+  /* ───────── CABINET ───────── */
   function renderCabinet() {
-    const s = Engine.get();
-    const body = $('cabinetBody');
-    const active = s.cabinetMessages.filter(m => !m.resolved);
-    const resolved = s.cabinetMessages.filter(m => m.resolved);
-
-    if (!active.length && !resolved.length) {
-      body.innerHTML = '<div class="empty-msg">Aucun message urgent pour l\'instant.</div>';
-      return;
-    }
-
-    body.innerHTML = active.map((msg, i) => `
-      <div class="cabinet-msg">
-        <div class="cm-from">${msg.from}</div>
-        <div class="cm-text">${msg.text}</div>
-        <div class="cm-choices">
-          ${msg.choices.map((c, ci) => `
-            <button class="cm-choice ${ci === 0 ? 'yes' : ci === 1 ? 'no' : 'mid'}"
-              onclick="UI.cabinetChoice(${s.cabinetMessages.indexOf(msg)}, ${ci})">
-              ${c.label}
-            </button>
-          `).join('')}
-        </div>
-        <div class="cm-timestamp">📅 ${msg.date}</div>
-      </div>
-    `).join('') + (resolved.length ? `<div class="panel-header" style="position:static;margin-top:8px;"><h3 style="font-size:11px">RÉSOLUS (${resolved.length})</h3></div>` + resolved.slice(0,3).map(msg => `
-      <div class="cabinet-msg" style="opacity:0.5">
-        <div class="cm-from">${msg.from} ✅</div>
-        <div class="cm-text">${msg.text}</div>
-        <div class="cm-timestamp">${msg.date}</div>
-      </div>
-    `).join('') : '');
+    const s=E.get(); const act=s.cabinetMessages.filter(m=>!m.resolved);
+    $('cabinetBody').innerHTML = act.length ? act.map(m=>{
+      const idx=s.cabinetMessages.indexOf(m);
+      return `<div class="cabinet-msg"><div class="cm-from">${m.from}</div><div class="cm-text">${m.text}</div>
+        <div class="cm-choices">${m.choices.map((c,ci)=>`<button class="cm-choice ${ci===0?'yes':ci===1?'no':'mid'}" onclick="UI.cab(${idx},${ci})">${c.label}</button>`).join('')}</div>
+        <div class="cm-timestamp">📅 ${m.date}</div></div>`;
+    }).join('') : '<div class="empty-msg">Aucun dossier urgent. Le cabinet vous recontactera.</div>';
   }
+  function cab(i,c){ E.resolveCabinet(i,c); renderCabinet(); }
 
-  function cabinetChoice(msgIdx, choiceIdx) {
-    Engine.resolveCabinet(msgIdx, choiceIdx);
-  }
-
-  /* ── Economy ── */
+  /* ───────── ÉCONOMIE ───────── */
   function renderEconomy() {
-    const s = Engine.get();
+    const s=E.get();
+    $('eco-over').innerHTML = `<div class="stat-grid">${[
+      ['PIB',money(s.gdp)],['Croissance',s.gdpGrowth.toFixed(1)+'%'],['Trésor',money(s.treasury)],
+      ['Inflation',s.inflation.toFixed(1)+'%'],['Chômage',s.unemployment.toFixed(1)+'%'],['IDH',s.idh.toFixed(3)],
+      ['Revenu/j','+'+s.dailyIncome.toFixed(0)+'M'],['Dépenses/j','-'+s.dailyExpenses.toFixed(0)+'M']
+    ].map(([l,v])=>`<div class="stat-card"><div class="stat-card-label">${l}</div><div class="stat-card-val">${v}</div></div>`).join('')}</div>`;
 
-    // Overview
-    $('ecoStats').innerHTML = [
-      ['PIB', fmt(s.gdp)],
-      ['Croissance', `${s.gdpGrowth.toFixed(1)}%`],
-      ['Trésor', fmt(s.treasury)],
-      ['Inflation', `${s.inflation.toFixed(1)}%`],
-      ['Chômage', `${s.unemployment.toFixed(1)}%`],
-      ['Revenu/jour', `+${s.dailyIncome.toFixed(0)}M`],
-      ['Dépenses/jour', `-${s.dailyExpenses.toFixed(0)}M`],
-      ['IDH', s.idh.toFixed(3)]
-    ].map(([label, val]) => `
-      <div class="stat-card">
-        <div class="stat-card-label">${label}</div>
-        <div class="stat-card-val">${val}</div>
-      </div>
-    `).join('');
+    $('eco-tax').innerHTML = `
+      ${slider('Impôt sur le revenu','taxRate',s.taxRate,5,60)}
+      ${slider('Impôt sociétés','corpTax',s.corpTax,5,60)}
+      ${slider('TVA','vatRate',s.vatRate,0,30)}
+      <div class="stat-row"><span>Revenu fiscal/jour</span><span>+${s.dailyIncome.toFixed(0)}M</span></div>
+      <div class="stat-row"><span>Effet popularité</span><span style="color:${s.taxRate>35?'#C62828':'#43A047'}">${s.taxRate>35?'⬇️ Charge lourde':'✅ Acceptable'}</span></div>`;
+    bindSliders();
 
-    // Taxes
-    $('taxSliders').innerHTML = `
-      <div class="slider-row">
-        <div class="slider-label"><span>🏛️ Impôt sur le revenu</span><span class="slider-val" id="sv-tax">${s.taxRate}%</span></div>
-        <input type="range" min="5" max="60" value="${s.taxRate}" oninput="document.getElementById('sv-tax').textContent=this.value+'%'; Engine.setTax('taxRate',+this.value)">
-      </div>
-      <div class="slider-row">
-        <div class="slider-label"><span>🏢 Impôt sociétés</span><span class="slider-val" id="sv-corp">${s.corpTax}%</span></div>
-        <input type="range" min="5" max="60" value="${s.corpTax}" oninput="document.getElementById('sv-corp').textContent=this.value+'%'; Engine.setTax('corpTax',+this.value)">
-      </div>
-      <div class="slider-row">
-        <div class="slider-label"><span>🛒 TVA</span><span class="slider-val" id="sv-vat">${s.vatRate}%</span></div>
-        <input type="range" min="0" max="30" value="${s.vatRate}" oninput="document.getElementById('sv-vat').textContent=this.value+'%'; Engine.setTax('vatRate',+this.value)">
-      </div>
-      <div class="stat-row" style="margin-top:12px">
-        <span>Revenu fiscal/jour</span>
-        <span>${s.dailyIncome.toFixed(0)}M</span>
-      </div>
-      <div class="stat-row">
-        <span>Impact bonheur</span>
-        <span style="color:${s.taxRate > 35 ? '#C62828' : '#43A047'}">${s.taxRate > 35 ? '⬇️ Charge élevée' : '✅ Modéré'}</span>
-      </div>
-    `;
-
-    renderResources();
-    renderTrade();
+    const jobs = s._companyJobs||0;
+    $('eco-jobs').innerHTML = `
+      <div class="stat-row"><span>💼 Emplois créés (entreprises)</span><span>${jobs.toLocaleString('fr-FR')}</span></div>
+      <div class="stat-row"><span>📊 Taux de chômage</span><span style="color:${s.unemployment>20?'#C62828':'#43A047'}">${s.unemployment.toFixed(1)}%</span></div>
+      <div class="stat-row"><span>🏢 Entreprises actives</span><span>${s.companies.filter(c=>c.active).length}</span></div>
+      <p class="hint">Créez des entreprises (onglet Entreprises) pour générer des emplois, réduire le chômage et augmenter la popularité.</p>`;
+  }
+  function slider(label,key,val,min,max,unit){
+    unit = unit===undefined ? '%' : unit;
+    return `<div class="slider-row"><div class="slider-label"><span>${label}</span><span class="slider-val" id="sv-${key}">${val}${unit}</span></div>
+      <input type="range" data-key="${key}" min="${min}" max="${max}" value="${val}"></div>`;
+  }
+  function bindSliders(){
+    document.querySelectorAll('#eco-tax input[type=range]').forEach(r=>r.addEventListener('input',()=>{
+      $('sv-'+r.dataset.key).textContent=r.value+'%';
+      E.setTax(r.dataset.key, +r.value);
+    }));
   }
 
+  /* ───────── RESSOURCES ───────── */
   function renderResources() {
-    const s = Engine.get();
-    const el = $('resourceCards');
-    if (!el) return;
-    const myRes = Object.keys(s.resourcePrices);
-    if (!myRes.length) {
-      el.innerHTML = '<div class="empty-msg">Aucune ressource extractible.</div>'; return;
-    }
-    el.innerHTML = myRes.map(r => {
-      const res = RESOURCES[r];
-      if (!res) return '';
-      const price = s.resourcePrices[r];
-      const change = ((price - res.basePrice) / res.basePrice * 100).toFixed(1);
-      const up = price >= res.basePrice;
-      return `
-        <div class="resource-card">
-          <div class="rc-icon">${res.emoji}</div>
-          <div class="rc-info">
-            <div class="rc-name">${res.name}</div>
-            <div class="rc-price">$${price.toLocaleString()} /${res.unit}</div>
-            <div class="rc-stock">Stock: ${(s.resourceStocks[r] || 0).toLocaleString()} ${res.unit}s</div>
-          </div>
-          <div class="rc-trend ${up ? 'up' : 'down'}">${up ? '↑' : '↓'}${Math.abs(change)}%</div>
-          <div class="rc-actions">
-            <button class="btn-sm btn-sell" onclick="Engine.sellResource('${r}', 1000)">Vendre 1K</button>
-            <button class="btn-sm btn-invest" onclick="Engine.investResource('${r}', 100)">Invest $100M</button>
-          </div>
+    const s=E.get(); const keys=Object.keys(s.resources);
+    $('resourceBody').innerHTML = keys.length ? keys.map(r=>{
+      const def=RESOURCES[r], R=s.resources[r];
+      const change=((R.price-def.basePrice)/def.basePrice*100);
+      const up=change>=0;
+      return `<div class="resource-card">
+        <div class="rc-icon">${def.emoji}</div>
+        <div class="rc-info">
+          <div class="rc-name">${def.name}</div>
+          <div class="rc-price">$${Math.round(R.price).toLocaleString('fr-FR')} /${def.unit}</div>
+          <div class="rc-stock">Prod: ${Math.round(R.production).toLocaleString('fr-FR')}/an · Export ${Math.round(R.exports*100)}% · Stock ${Math.round(R.stock).toLocaleString('fr-FR')}</div>
         </div>
-      `;
-    }).join('');
+        <div style="text-align:right">
+          <div class="rc-trend ${up?'up':'down'}">${up?'↑':'↓'}${Math.abs(change).toFixed(1)}%</div>
+          <button class="btn-sm btn-sell" onclick="Engine.sellResource('${r}',${Math.round(R.production/12)})">Vendre</button>
+          <button class="btn-sm btn-invest" onclick="Engine.investResource('${r}',150);UI.renderResources()">Invest +8%</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty-msg">Aucune ressource exploitable.</div>';
   }
 
+  /* ───────── ENTREPRISES ───────── */
+  function renderCompanies() {
+    const s=E.get();
+    const mine=s.companies;
+    $('co-mine').innerHTML = mine.length ? mine.map(c=>`
+      <div class="company-card ${c.active?'':'closed'}">
+        <div class="cmp-head"><span>${c.emoji} ${c.name}</span><span class="${c.active?'text-green':'text-red'}">${c.active?'🟢 Active':'🔴 Fermée'}</span></div>
+        <div class="cmp-line">${c.typeName} · Fondée le ${c.founded}</div>
+        <div class="cmp-stats">
+          <span>💼 ${c.jobs.toLocaleString('fr-FR')} emplois</span>
+          <span>💰 +$${c.dailyRevenue.toFixed(2)}M/j</span>
+          <span>🏗️ $${c.investment}M investis</span>
+        </div>
+        ${c.active?`<button class="btn-sm btn-sell" style="margin-top:6px" onclick="if(confirm('Fermer ${c.name} ? Les emplois seront perdus.')){Engine.closeCompany('${c.id}');UI.renderCompanies();}">Fermer</button>`:''}
+      </div>`).join('') : '<div class="empty-msg">Vous n\'avez créé aucune entreprise.<br>Allez dans l\'onglet « Créer ».</div>';
+
+    $('co-new').innerHTML = `
+      <div class="form-block">
+        <label>Type d'entreprise</label>
+        <select id="coType" onchange="UI.coTypeChange()">${COMPANY_TYPES.map(t=>`<option value="${t.id}">${t.emoji} ${t.name} (min $${t.minInvest}M)</option>`).join('')}</select>
+        <label>Nom de l'entreprise</label>
+        <input id="coName" type="text" placeholder="Ex: HakVision Mining" value="HakVision Mining"/>
+        <label>Investissement ($M) — <span id="coInvestLbl">200</span></label>
+        <input id="coInvest" type="range" min="50" max="3000" value="200" oninput="document.getElementById('coInvestLbl').textContent=this.value;UI.coPreview()">
+        <div id="coPreview" class="co-preview"></div>
+        <button class="btn-create" onclick="UI.createCompany()">⚡ CRÉER L'ENTREPRISE</button>
+      </div>`;
+    coTypeChange();
+  }
+  function coTypeChange(){ coPreview(); }
+  function coPreview() {
+    const t=COMPANY_TYPES.find(x=>x.id=== $('coType').value);
+    const inv=+$('coInvest').value;
+    const jobs=Math.round(inv*t.jobsPerM), rev=(inv*t.revPerM/365).toFixed(2);
+    $('coPreview').innerHTML = `<div class="stat-row"><span>💼 Emplois créés</span><span>${jobs.toLocaleString('fr-FR')}</span></div>
+      <div class="stat-row"><span>💰 Revenu estimé/jour</span><span>~$${rev}M</span></div>
+      <div class="stat-row"><span>📈 Ressource liée</span><span>${RESOURCES[t.resource]?.emoji||''} ${RESOURCES[t.resource]?.name||'-'}</span></div>`;
+  }
+  function createCompany() {
+    const t=$('coType').value, name=$('coName').value.trim()||'Entreprise', inv=+$('coInvest').value;
+    if (E.createCompany(t,name,inv)) { renderCompanies(); refresh(); }
+  }
+
+  /* ───────── COMMERCE ───────── */
   function renderTrade() {
-    const s = Engine.get();
-    const el = $('tradePanel');
-    if (!el) return;
-    el.innerHTML = `
-      <div class="stat-row"><span>Exportations/an</span><span>${fmt(s.gdp * 0.2)}</span></div>
-      <div class="stat-row"><span>Importations/an</span><span>${fmt(s.gdp * 0.18)}</span></div>
-      <div class="stat-row"><span>Balance commerciale</span><span class="text-green">+${fmt(s.gdp * 0.02)}</span></div>
-      <div style="margin-top:12px">
-        ${s.nations.filter(n => n.relation === 'ally').map(n => `
-          <div class="stat-row"><span>${n.flag} ${n.name}</span><span class="text-green">Partenaire ✅</span></div>
-        `).join('')}
-      </div>
-    `;
+    const s=E.get();
+    $('tr-contracts').innerHTML = s.tradeContracts.length ? s.tradeContracts.map(t=>`
+      <div class="contract-card">
+        <div class="cmp-head"><span>${t.emoji} ${t.resourceName} → ${t.partnerFlag} ${t.partnerName}</span><span class="text-gold">${t.yearsLeft} an(s)</span></div>
+        <div class="cmp-stats"><span>📦 ${t.volume.toLocaleString('fr-FR')} u/an</span><span>💰 +$${t.dailyRevenue.toFixed(2)}M/j</span><span>📅 dès ${t.signed}</span></div>
+      </div>`).join('') : '<div class="empty-msg">Aucun contrat actif. Signez-en un dans « Nouveau contrat ».</div>';
+
+    const keys=Object.keys(s.resources);
+    $('tr-new').innerHTML = keys.length ? `
+      <div class="form-block">
+        <label>Ressource à exporter</label>
+        <select id="trRes">${keys.map(r=>`<option value="${r}">${RESOURCES[r].emoji} ${RESOURCES[r].name} ($${Math.round(s.resources[r].price).toLocaleString('fr-FR')}/${RESOURCES[r].unit})</option>`).join('')}</select>
+        <label>Pays acheteur</label>
+        <select id="trPartner">${TRADE_PARTNERS.map(p=>`<option value="${p.id}">${p.flag} ${p.name} (prix ×${p.priceMod})</option>`).join('')}</select>
+        <label>Volume annuel (unités) — <span id="trVolLbl">100000</span></label>
+        <input id="trVol" type="range" min="10000" max="2000000" step="10000" value="100000" oninput="document.getElementById('trVolLbl').textContent=(+this.value).toLocaleString('fr-FR');UI.trPreview()">
+        <label>Durée du contrat — <span id="trYrLbl">5</span> ans</label>
+        <input id="trYr" type="range" min="1" max="15" value="5" oninput="document.getElementById('trYrLbl').textContent=this.value;UI.trPreview()">
+        <div id="trPreview" class="co-preview"></div>
+        <button class="btn-create" onclick="UI.signContract()">✍️ SIGNER LE CONTRAT</button>
+      </div>` : '<div class="empty-msg">Aucune ressource à exporter.</div>';
+    if(keys.length) trPreview();
+  }
+  function trPreview() {
+    const s=E.get(); const r=$('trRes').value; const p=TRADE_PARTNERS.find(x=>x.id===$('trPartner').value);
+    const vol=+$('trVol').value; const price=s.resources[r].price*p.priceMod;
+    const daily=(vol*price/365/1e6).toFixed(2);
+    $('trPreview').innerHTML=`<div class="stat-row"><span>💰 Revenu/jour</span><span>+$${daily}M</span></div>
+      <div class="stat-row"><span>💵 Prix unitaire</span><span>$${Math.round(price).toLocaleString('fr-FR')}</span></div>`;
+  }
+  function signContract() {
+    if (E.signTradeContract($('trRes').value,$('trPartner').value,+$('trVol').value,+$('trYr').value)) { renderTrade(); refresh(); }
   }
 
-  /* ── Energy ── */
-  function renderEnergy() {
-    const s = Engine.get();
-    $('energyCap').textContent = `${s.energyCap.toLocaleString()} MW`;
-    $('electrRate').textContent = `${s.electrRate.toFixed(0)}%`;
-    $('hydroPct').textContent = `${s.hydroPct.toFixed(0)}%`;
-
-    $('energyProjects').innerHTML = s.infrastructure.energy.map(b => `
-      <div class="build-card ${b.built ? 'built' : b.building ? 'building' : ''}">
-        <div class="bc-emoji">${b.emoji}</div>
-        <div class="bc-name">${b.name}</div>
-        <div class="bc-cost">💰 $${b.cost}M</div>
-        <div class="bc-effect">${b.effect}</div>
-        <div class="bc-status">${
-          b.built ? '✅ Opérationnel' :
-          b.building ? `🏗️ ${b.progress}/${b.days} jours` :
-          `⏳ ${b.days} jours`
-        }</div>
-        ${!b.built && !b.building ? `<button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildInfra('energy','${b.id}')">Construire</button>` : ''}
-      </div>
-    `).join('');
-
-    $('roadKm').textContent = `${s.roadKm.toLocaleString()} km`;
-    $('airports').textContent = s.airports;
-
-    $('roadProjects').innerHTML = s.infrastructure.road.map(b => `
-      <div class="build-card ${b.built ? 'built' : b.building ? 'building' : ''}">
-        <div class="bc-emoji">${b.emoji}</div>
-        <div class="bc-name">${b.name}</div>
-        <div class="bc-cost">💰 $${b.cost}M</div>
-        <div class="bc-effect">${b.effect}</div>
-        <div class="bc-status">${
-          b.built ? '✅ Opérationnel' :
-          b.building ? `🏗️ ${b.progress}/${b.days} jours` :
-          `⏳ ${b.days} jours`
-        }</div>
-        ${!b.built && !b.building ? `<button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildInfra('road','${b.id}')">Construire</button>` : ''}
-      </div>
-    `).join('');
-
-    renderNetworks();
-
-    $('infraBuild').innerHTML = `
-      <div class="stat-row"><span>⚡ Capacité totale</span><span>${s.energyCap.toLocaleString()} MW</span></div>
-      <div class="stat-row"><span>🔌 Taux électrification</span><span>${s.electrRate.toFixed(0)}%</span></div>
-      <div class="stat-row"><span>🛣️ Réseau routier</span><span>${s.roadKm.toLocaleString()} km</span></div>
-      <div class="stat-row"><span>✈️ Aéroports</span><span>${s.airports}</span></div>
-    `;
-  }
-
-  /* ── Development ── */
-  function renderDevelopment() {
-    const s = Engine.get();
-    $('literacy').textContent = `${s.literacy.toFixed(0)}%`;
-    $('idh').textContent = s.idh.toFixed(3);
-    $('lifeExp').textContent = `${s.lifeExp.toFixed(0)} ans`;
-    $('healthRank').textContent = `${s.healthRank}ème mondial`;
-
-    $('healthBuild').innerHTML = HEALTH_BUILDINGS.map(b => {
-      const builtCount = s.healthBuilt.filter(x => x.id === b.id).length;
-      return `
-        <div class="build-card">
-          <div class="bc-emoji">${b.emoji}</div>
-          <div class="bc-name">${b.name}</div>
-          <div class="bc-cost">💰 -$${b.cost}M</div>
-          <div class="bc-effect">${b.effect}</div>
-          <div class="bc-status">Construit: ${builtCount}x</div>
-          <button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildHealth('${b.id}')">Construire</button>
-        </div>
-      `;
-    }).join('');
-
-    $('eduBuild').innerHTML = EDU_BUILDINGS.map(b => {
-      const builtCount = s.eduBuilt.filter(x => x.id === b.id).length;
-      return `
-        <div class="build-card">
-          <div class="bc-emoji">${b.emoji}</div>
-          <div class="bc-name">${b.name}</div>
-          <div class="bc-cost">💰 -$${b.cost}M</div>
-          <div class="bc-effect">${b.effect}</div>
-          <div class="bc-status">Construit: ${builtCount}x</div>
-          <button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildEdu('${b.id}')">Construire</button>
-        </div>
-      `;
-    }).join('');
-  }
-
-  /* ── Diplomacy ── */
-  function renderDiplomacy() {
-    const s = Engine.get();
-    $('nationsList').innerHTML = s.nations.map(n => `
-      <div class="nation-card">
-        <div class="nc-flag">${n.flag}</div>
-        <div class="nc-info">
-          <div class="nc-name">${n.name}
-            ${s.wars.includes(n.id) ? '<span class="war-badge">⚔️ GUERRE</span>' : ''}
-            ${n.relation === 'ally' && !s.wars.includes(n.id) ? '<span class="ally-badge">🤝 ALLIÉ</span>' : ''}
-          </div>
-          <div class="nc-rel ${n.relation}">
-            ${n.relation === 'ally' ? '🟢 Allié' : n.relation === 'hostile' ? '🔴 Hostile' : '⚪ Neutre'}
-            · PIB: ${fmt(n.gdp)} · Armée: ${n.army}/100
-          </div>
-        </div>
-        <div class="nc-actions">
-          ${n.relation !== 'ally' && !s.wars.includes(n.id) ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','ally')">🤝 Alliance</button>` : ''}
-          ${!s.wars.includes(n.id) ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','trade')">📦 Commerce</button>` : ''}
-          ${s.wars.includes(n.id) ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','peace')">🕊️ Paix</button>` :
-            n.relation !== 'ally' ? `<button class="btn-diplo btn-war" onclick="if(confirm('Déclarer la guerre à ${n.name} ?')) Engine.diplo('${n.id}','war')">⚔️ Guerre</button>` : ''
-          }
-        </div>
-      </div>
-    `).join('');
-
-    $('alliancesList').innerHTML = `
-      <div class="stat-row"><span>🤝 Alliés</span><span>${s.nations.filter(n=>n.relation==='ally').length}</span></div>
-      <div class="stat-row"><span>⚔️ Conflits actifs</span><span class="${s.wars.length ? 'text-red' : 'text-green'}">${s.wars.length}</span></div>
-      <div class="stat-row"><span>⚪ Relations neutres</span><span>${s.nations.filter(n=>n.relation==='neutral').length}</span></div>
-      ${s.nations.filter(n=>n.relation==='ally').map(n=>`
-        <div class="nation-card" style="margin-top:8px">
-          <div class="nc-flag">${n.flag}</div>
-          <div class="nc-info"><div class="nc-name">${n.name} <span class="ally-badge">ALLIÉ</span></div>
-          <div class="nc-rel ally">PIB combiné: ${fmt(n.gdp)}</div></div>
-        </div>
-      `).join('')}
-    `;
-
-    $('tradeAgreements').innerHTML = `
-      <div class="stat-row"><span>📦 Accords actifs</span><span>${s.nations.filter(n=>n.relation==='ally').length * 2}</span></div>
-      <div class="stat-row"><span>💰 Revenus commerciaux/an</span><span class="text-green">${fmt(s.dailyIncome * 30)}</span></div>
-      <p style="color:var(--text-dim);font-size:12px;padding:12px">Signez des alliances pour débloquer des accords commerciaux préférentiels.</p>
-    `;
-  }
-
-  /* ── Defense ── */
-  function renderDefense() {
-    const s = Engine.get();
-    $('defBudget').innerHTML = `
-      <div class="budget-card">
-        <div class="budget-title">⚔️ Budget Militaire</div>
-        <div class="slider-row">
-          <div class="slider-label"><span>Budget annuel</span><span class="slider-val" id="sv-def">$${s.defBudget}M</span></div>
-          <input type="range" min="100" max="${Math.floor(s.gdp * 0.1)}" value="${s.defBudget}"
-            oninput="document.getElementById('sv-def').textContent='$'+this.value+'M'; Engine.setDefBudget(+this.value)">
-        </div>
-        <div class="stat-row"><span>% du PIB</span><span>${(s.defBudget / s.gdp * 100).toFixed(2)}%</span></div>
-        <div class="stat-row"><span>Impact sécurité</span><span class="text-green">+${(s.defBudget / 1000).toFixed(1)} pts</span></div>
-      </div>
-      <div class="budget-card">
-        <div class="budget-title">🕵️ Budget Renseignement</div>
-        <div class="stat-row"><span>Budget annuel</span><span>${fmt(s.intelBudget)}</span></div>
-        <button class="btn-sm btn-invest" style="margin-top:8px" onclick="if(Engine.get().treasury > 50) { Engine.get().intelBudget += 50; Engine.get().treasury -= 50; UI.renderDefense(); }">+ $50M Renforcer</button>
-      </div>
-    `;
-
-    $('defArmy').innerHTML = `
-      <div class="stat-row"><span>👨‍✈️ Effectifs FARDC</span><span>${Math.floor(134000 + s.defBudget * 10).toLocaleString()}</span></div>
-      <div class="stat-row"><span>🚁 Hélicoptères</span><span>${Math.floor(s.defBudget / 150)}</span></div>
-      <div class="stat-row"><span>🛡️ Blindés</span><span>${Math.floor(s.defBudget / 80)}</span></div>
-      <div class="stat-row"><span>🔒 Niveau cyberdéfense</span><span>${s.intelBudget > 200 ? '🟢 Élevé' : s.intelBudget > 100 ? '🟡 Moyen' : '🔴 Faible'}</span></div>
-      <div class="stat-row"><span>⚡ Niveau alerte</span><span>${s.wars.length ? '🔴 GUERRE' : s.security < 40 ? '🟡 ÉLEVÉ' : '🟢 NORMAL'}</span></div>
-    `;
-
-    $('defWar').innerHTML = s.wars.length ? s.wars.map(wId => {
-      const n = s.nations.find(x => x.id === wId);
-      return `
-        <div class="nation-card">
-          <div class="nc-flag">${n?.flag || '🏳️'}</div>
-          <div class="nc-info">
-            <div class="nc-name">${n?.name || wId} <span class="war-badge">EN GUERRE</span></div>
-            <div class="nc-rel hostile">Conflit actif — Coût: $${(s.defBudget * 0.3).toFixed(0)}M/an</div>
-          </div>
-          <button class="btn-diplo" onclick="Engine.diplo('${wId}','peace')">🕊️ Négocier la paix</button>
-        </div>
-      `;
-    }).join('') : '<div class="empty-msg">✅ Aucun conflit actif.</div>';
-  }
-
-  /* ── Intelligence ── */
-  function renderIntelligence() {
-    const s = Engine.get();
-    $('intelBody').innerHTML = `
-      <div style="padding:12px">
-        <div class="stat-row"><span>🕵️ Agents actifs</span><span>${Math.floor(s.intelBudget / 5)}</span></div>
-        <div class="stat-row"><span>🌍 Opérations à l'étranger</span><span>${Math.floor(s.intelBudget / 20)}</span></div>
-        <div class="stat-row"><span>💻 Cyberdéfense</span><span>${s.intelBudget > 150 ? '🟢 Haute' : '🟡 Moyenne'}</span></div>
-        <div class="stat-row"><span>📡 Capacité SIGINT</span><span>${s.intelBudget > 200 ? '🟢 Active' : '🔴 Limitée'}</span></div>
-        <div style="margin-top:12px; padding:12px; background:var(--surface2); border-radius:10px; border:1px solid var(--border)">
-          <div style="font-size:11px;color:var(--gold);margin-bottom:8px;letter-spacing:2px">RAPPORT CONFIDENTIEL</div>
-          <div style="font-size:13px;line-height:1.6">
-            ${s.nations.filter(n=>n.relation==='hostile' || s.wars.includes(n.id)).map(n=>
-              `⚠️ ${n.flag} ${n.name} — Activité militaire anormale détectée à la frontière.`
-            ).join('<br>') || '✅ Aucune menace détectée sur le territoire national.'}
-          </div>
-        </div>
-        <button class="btn-sm btn-invest" style="width:100%;margin-top:12px" onclick="if(Engine.get().treasury>100){Engine.get().intelBudget+=100;Engine.get().treasury-=100;UI.renderIntelligence();}">+ $100M Opération Spéciale</button>
-      </div>
-    `;
-  }
-
-  /* ── News ── */
-  function renderNews() {
-    const s = Engine.get();
-    $('newsLocal').innerHTML = s.newsLocal.slice(0, 8).map(n => `
-      <div class="news-item">
-        ${n.text}
-        <div class="news-date">📅 ${n.date}</div>
-      </div>
-    `).join('') || '<div class="empty-msg">Pas d\'actualités.</div>';
-
-    $('newsWorld').innerHTML = s.newsWorld.slice(0, 8).map(n => `
-      <div class="news-item">
-        ${n.text}
-        <div class="news-date">📅 ${n.date}</div>
-      </div>
-    `).join('') || '<div class="empty-msg">Pas d\'actualités.</div>';
-
-    setBadge('news', 0);
-  }
-
-  /* ── Sports ── */
-  function renderSports() {
-    const s = Engine.get();
-    $('sportsRank').innerHTML = `
-      <table class="sports-table">
-        <thead><tr><th>Sport</th><th>Rang Mondial</th><th>Niveau</th></tr></thead>
-        <tbody>
-          ${s.sports.map(sp => `
-            <tr>
-              <td>${sp.emoji} ${sp.name}</td>
-              <td><span class="rank-num ${rankColor(sp.rank)}">${Math.floor(sp.rank)}</span></td>
-              <td><span class="stars">${stars(sp.stars)}</span></td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
-
-    $('sportsManage').innerHTML = s.sports.map((sp, i) => `
-      <div class="stat-row" style="flex-direction:column;align-items:flex-start;gap:6px">
-        <div style="display:flex;justify-content:space-between;width:100%">
-          <span>${sp.emoji} ${sp.name}</span>
-          <span class="text-gold">Budget: $${sp.budget}M</span>
-        </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn-sm btn-invest" onclick="Engine.investSport(${i}, 50)">+$50M</button>
-          <button class="btn-sm btn-invest" onclick="Engine.investSport(${i}, 100)">+$100M</button>
-          <button class="btn-sm btn-invest" onclick="Engine.investSport(${i}, 200)">+$200M</button>
-        </div>
-      </div>
-    `).join('');
-
-    $('sportsResults').innerHTML = `
-      <div class="stat-row"><span>🥇 Médailles d'or</span><span>${s.sports.filter(sp=>sp.rank<=10).length}</span></div>
-      <div class="stat-row"><span>🥈 Médailles d'argent</span><span>${s.sports.filter(sp=>sp.rank>10&&sp.rank<=25).length}</span></div>
-      <div class="stat-row"><span>🏆 Top 50 mondial</span><span>${s.sports.filter(sp=>sp.rank<=50).length} sports</span></div>
-      <div class="stat-row"><span>🌍 Rang sportif global</span><span class="text-gold">${Math.floor(s.sports.reduce((a,sp)=>a+sp.rank,0)/s.sports.length)}ème</span></div>
-      <div style="margin-top:12px">
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">PROCHAINS ÉVÉNEMENTS</div>
-        <div class="news-item">🏆 CAN 2025 — Qualification: ${s.sports[0]?.rank < 50 ? '✅ Qualifié' : '❌ Éliminé'}</div>
-        <div class="news-item">🌍 Jeux Africains — Délégation: ${Math.floor(s.sports.length * 2.5)} athlètes</div>
-      </div>
-    `;
-  }
-
-  /* ── Resource Market (RDC Hub) ── */
-  function renderResourceMarket() {
-    const s = Engine.get();
-    const el = $('resourceMarket');
-    const myRes = Object.keys(s.resourcePrices);
-
-    if (!myRes.length) {
-      el.innerHTML = '<div class="empty-msg">Aucune ressource minière disponible.</div>'; return;
-    }
-
-    el.innerHTML = myRes.map(r => {
-      const res = RESOURCES[r];
-      if (!res) return '';
-      const price = s.resourcePrices[r];
-      const base = res.basePrice;
-      const change = ((price - base) / base * 100).toFixed(1);
-      const up = price >= base;
-      const bars = Array.from({length:8}, (_,i) => {
-        const h = 10 + Math.random() * 30;
-        return `<div class="chart-bar" style="left:${i*11+2}px;height:${h}px;background:${up?'var(--green-light)':'var(--red)'}"></div>`;
-      }).join('');
-      return `
-        <div class="market-card">
-          <div class="market-name">
-            <span>${res.emoji} ${res.name}</span>
-            <span style="color:${up?'var(--green-light)':'var(--red)'}">${up?'↑':'↓'}${Math.abs(change)}%</span>
-          </div>
-          <div class="market-price">$${price.toLocaleString(undefined,{maximumFractionDigits:0})} <span style="font-size:11px;color:var(--text-dim)">/${res.unit}</span></div>
-          <div class="market-chart">${bars}</div>
-          <div class="stat-row" style="margin-top:8px"><span>Stock</span><span>${(s.resourceStocks[r]||0).toLocaleString()} ${res.unit}s</span></div>
-          <div class="stat-row"><span>Description</span><span style="font-size:11px">${res.desc}</span></div>
-          <div class="market-actions">
-            <button class="btn-sm btn-sell" onclick="Engine.sellResource('${r}',1000)">Vendre 1 000</button>
-            <button class="btn-sm btn-sell" onclick="Engine.sellResource('${r}',10000)">Vendre 10 000</button>
-            <button class="btn-sm btn-invest" onclick="Engine.investResource('${r}',200)">Invest $200M</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  /* ── Police & Justice ── */
-  function renderPolice() {
-    const s = Engine.get();
-    const year = s.date.getFullYear();
-
-    $('pol-stats').innerHTML = `
-      <div class="section-title">Les statistiques estimées sur l'année ${year} :</div>
-      ${CRIME_TYPES.map(c => `
-        <div class="crime-row">
-          <span>${c.name} :</span>
-          <span class="crime-val">${(s.crimes[c.id] || 0).toLocaleString('fr-FR')}</span>
-        </div>
-      `).join('')}
-      <div class="section-title" style="margin-top:16px">L'avis des gens sur la situation actuelle :</div>
-      ${s.opinions.slice(0, 5).map(o => `
-        <div class="opinion-item">
-          <span class="op-avatar">👤</span>
-          <div>
-            <div class="op-name">${o.name}, ${o.age} ans</div>
-            <div class="op-text">💬 ${o.text}</div>
-          </div>
-        </div>
-      `).join('')}
-    `;
-
-    $('pol-budget').innerHTML = `
-      <div class="budget-card">
-        <div class="budget-title">🚔 Budget de la Police Nationale</div>
-        <div class="slider-row">
-          <div class="slider-label"><span>Budget annuel</span><span class="slider-val" id="sv-pol">$${s.policeBudget}M</span></div>
-          <input type="range" min="20" max="${Math.max(500, Math.floor(s.gdp * 0.02))}" value="${s.policeBudget}"
-            oninput="document.getElementById('sv-pol').textContent='$'+this.value+'M'; Engine.setPoliceBudget(+this.value)">
-        </div>
-        <div class="stat-row"><span>👮 Effectifs</span><span>${Math.floor(s.policeBudget * 180).toLocaleString('fr-FR')} agents</span></div>
-        <div class="stat-row"><span>🚓 Véhicules de patrouille</span><span>${Math.floor(s.policeBudget * 4).toLocaleString('fr-FR')}</span></div>
-        <div class="stat-row"><span>📹 Caméras de surveillance</span><span>${Math.floor(s.policeBudget * 25).toLocaleString('fr-FR')}</span></div>
-        <div class="stat-row"><span>Efficacité</span><span>${s.policeBudget / s.population > 5 ? '🟢 Élevée' : s.policeBudget / s.population > 2 ? '🟡 Moyenne' : '🔴 Insuffisante'}</span></div>
-        <p style="color:var(--text-dim);font-size:12px;margin-top:8px">Un meilleur financement réduit directement la criminalité estimée.</p>
-      </div>
-    `;
-
-    $('pol-opinions').innerHTML = s.opinions.map(o => `
-      <div class="opinion-item">
-        <span class="op-avatar">👤</span>
-        <div>
-          <div class="op-name">${o.name}, ${o.age} ans</div>
-          <div class="op-text">💬 ${o.text}</div>
-        </div>
-      </div>
-    `).join('') || '<div class="empty-msg">Aucun avis pour le moment.</div>';
-  }
-
-  /* ── Social ── */
-  function renderSocial() {
-    const s = Engine.get();
-
-    $('soc-fin').innerHTML = s.social.map(p => `
-      <div class="policy-row">
-        <span class="policy-name">${p.name}</span>
-        <div class="stepper">
-          <button class="step-btn minus" onclick="Engine.setPolicy('${p.id}', -1)">−</button>
-          <span class="step-val">${p.val}</span>
-          <button class="step-btn plus" onclick="Engine.setPolicy('${p.id}', 1)">+</button>
-        </div>
-      </div>
-    `).join('');
-
-    const workWeek = Engine.getPolicy('workWeek');
-    $('soc-impact').innerHTML = `
-      <div class="stat-row"><span>💰 Coût social total/jour</span><span class="text-red">-$${(s.dailyExpenses * 0.3).toFixed(1)}M</span></div>
-      <div class="stat-row"><span>😊 Impact bonheur</span><span class="${workWeek <= 40 ? 'text-green' : 'text-red'}">${workWeek <= 40 ? '✅ Positif' : '⚠️ Négatif'}</span></div>
-      <div class="stat-row"><span>📈 Impact productivité</span><span>${workWeek >= 40 ? '🟢 ' : '🟡 '}${(80 + workWeek / 2).toFixed(0)}%</span></div>
-      <div class="stat-row"><span>👴 Retraités estimés</span><span>${(s.population * (70 - Engine.getPolicy('retirementAge')) * 0.012).toFixed(1)}M</span></div>
-      <div class="stat-row"><span>📊 Taux de chômage</span><span>${s.unemployment.toFixed(1)}%</span></div>
-      <p style="color:var(--text-dim);font-size:12px;padding:12px">
-        Des allocations généreuses augmentent le bonheur mais pèsent sur le budget.
-        Une semaine de travail courte plaît à la population mais réduit la productivité nationale.
-      </p>
-    `;
-  }
-
-  /* ── Population ── */
-  function renderPopulation() {
-    const s = Engine.get();
-    const popExact = Math.floor(s.population * 1e6);
-    const births = Math.floor(popExact * s.birthRate / 1000);
-    const deaths = Math.floor(popExact * s.mortality / 1000);
-    const natural = births - deaths;
-
-    $('pop-stats').innerHTML = `
-      <div class="crime-row"><span>Population :</span><span class="crime-val">${popExact.toLocaleString('fr-FR')}</span></div>
-      <div class="crime-row"><span>Taux de natalité :</span><span class="crime-val">${s.birthRate.toFixed(1)} ‰</span></div>
-      <div class="crime-row"><span>Taux de mortalité :</span><span class="crime-val">${s.mortality.toFixed(1)} ‰</span></div>
-      <div class="crime-row"><span>Naissances estimées/an :</span><span class="crime-val">${births.toLocaleString('fr-FR')}</span></div>
-      <div class="crime-row"><span>Décès estimés/an :</span><span class="crime-val">${deaths.toLocaleString('fr-FR')}</span></div>
-      <div class="crime-row"><span>Accroissement naturel :</span><span class="crime-val" style="color:${natural >= 0 ? 'var(--green-light)' : 'var(--red)'}">${natural >= 0 ? '+' : ''}${natural.toLocaleString('fr-FR')}</span></div>
-      <div class="crime-row"><span>Espérance de vie des hommes :</span><span class="crime-val">${Math.floor(s.lifeExpM)} ans</span></div>
-      <div class="crime-row"><span>Espérance de vie des femmes :</span><span class="crime-val">${Math.floor(s.lifeExpF)} ans</span></div>
-      <div class="crime-row"><span>Alphabétisation :</span><span class="crime-val">${s.literacy.toFixed(0)} %</span></div>
-      <div class="crime-row"><span>IDH :</span><span class="crime-val">${s.idh.toFixed(3)}</span></div>
-    `;
-
-    $('pop-policy').innerHTML = `
-      <div class="budget-card">
-        <div class="budget-title">👶 Politique familiale</div>
-        <button class="btn-sm btn-invest" style="width:100%;margin-bottom:8px"
-          onclick="const s=Engine.get(); if(s.treasury>=100){s.treasury-=100;s.birthRate+=0.5;UI.notify('👶 Allocations familiales renforcées (+0.5‰ natalité)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
-          💰 Allocations familiales (-$100M, natalité +0.5‰)
-        </button>
-        <button class="btn-sm btn-invest" style="width:100%;margin-bottom:8px"
-          onclick="const s=Engine.get(); if(s.treasury>=200){s.treasury-=200;s.mortality=Math.max(4,s.mortality-0.4);s.lifeExpM+=0.5;s.lifeExpF+=0.5;UI.notify('🏥 Campagne de vaccination nationale (-0.4‰ mortalité)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
-          💉 Campagne de vaccination (-$200M, mortalité -0.4‰)
-        </button>
-        <button class="btn-sm btn-invest" style="width:100%"
-          onclick="const s=Engine.get(); if(s.treasury>=150){s.treasury-=150;s.lifeExpM+=1;s.lifeExpF+=1;UI.notify('🍚 Programme nutrition (+1 an espérance de vie)','success');UI.renderPopulation();UI.update();}else{UI.notify('Fonds insuffisants !','error');}">
-          🍚 Programme nutrition (-$150M, +1 an espérance de vie)
-        </button>
-      </div>
-    `;
-  }
-
-  /* ── Réseaux d'infrastructure ── */
-  function renderNetworks() {
-    const s = Engine.get();
-    const el = $('networksQuality');
-    if (!el || !s.networks) return;
-
-    el.innerHTML = `
-      <div class="stat-row"><span>🌍 La place en termes de l'infrastructure</span><span>${Engine.infraRank()}ème place</span></div>
-      ${s.networks.map(n => {
-        const def = NETWORK_DEFS.find(d => d.id === n.id);
-        const nstars = Engine.networkStars(n);
-        return `
-          <div class="network-card ${n.building ? 'net-building' : ''}">
-            <div class="net-head">
-              <span>${def.emoji} ${def.name}</span>
-              <span class="stars">${'★'.repeat(nstars)}${'☆'.repeat(5 - nstars)}</span>
-            </div>
-            <div class="net-info">
-              <span>📏 ${Math.floor(n.km).toLocaleString('fr-FR')} km</span>
-              <span class="${n.building ? 'text-gold' : 'text-dim'}">${n.building ? `🏗️ +${def.kmDay} km/j · -$${def.costDay}M/j` : `Coût: $${def.costDay}M/j`}</span>
-            </div>
-            <button class="btn-sm ${n.building ? 'btn-sell' : 'btn-invest'}" style="width:100%;margin-top:6px"
-              onclick="Engine.toggleNetwork('${n.id}')">
-              ${n.building ? '⏹️ Arrêter la construction' : '🏗️ Lancer la construction'}
-            </button>
-          </div>
-        `;
-      }).join('')}
-    `;
-  }
-
-  /* ── Carte du Monde ── */
+  /* ───────── CARTE DU MONDE ───────── */
+  let mapScale=1, mapX=0, mapY=0;
   function renderWorldMap() {
-    const s = Engine.get();
-    const playerCoord = MAP_COORDS[s.countryId] || [500, 250];
-
-    const markers = s.nations.map(n => {
-      const c = MAP_COORDS[n.id];
-      if (!c) return '';
-      const color = s.wars.includes(n.id) ? '#FF1744' : n.relation === 'ally' ? '#43A047' : n.relation === 'hostile' ? '#C62828' : '#90A4AE';
-      return `
-        <circle cx="${c[0]}" cy="${c[1]}" r="9" fill="${color}" stroke="#fff" stroke-width="1.5"
-          style="cursor:pointer" onclick="UI.mapSelect('${n.id}')"/>
-        <text x="${c[0]}" y="${c[1] - 14}" text-anchor="middle" font-size="13" fill="#E8E8F0"
-          style="cursor:pointer;font-family:Rajdhani" onclick="UI.mapSelect('${n.id}')">${n.flag}</text>
-      `;
+    const s=E.get();
+    const me=MAP_COORDS[s.countryId]||[558,272];
+    const markers=s.nations.map(n=>{
+      const c=MAP_COORDS[n.id]; if(!c) return '';
+      const col=s.wars.includes(n.id)?'#FF1744':n.relation==='ally'?'#43A047':n.relation==='hostile'?'#C62828':'#90A4AE';
+      return `<circle cx="${c[0]}" cy="${c[1]}" r="8" fill="${col}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="UI.mapSel('${n.id}')"/>
+        <text x="${c[0]}" y="${c[1]-12}" text-anchor="middle" font-size="13" style="cursor:pointer" onclick="UI.mapSel('${n.id}')">${n.flag}</text>`;
     }).join('');
-
-    const warLines = s.wars.map(wId => {
-      const c = MAP_COORDS[wId];
-      if (!c) return '';
-      return `<line x1="${playerCoord[0]}" y1="${playerCoord[1]}" x2="${c[0]}" y2="${c[1]}"
-        stroke="#FF1744" stroke-width="2" stroke-dasharray="6,4" opacity="0.8"/>`;
-    }).join('');
-
-    const allyLines = s.nations.filter(n => n.relation === 'ally' && MAP_COORDS[n.id]).map(n => {
-      const c = MAP_COORDS[n.id];
-      return `<line x1="${playerCoord[0]}" y1="${playerCoord[1]}" x2="${c[0]}" y2="${c[1]}"
-        stroke="#43A047" stroke-width="1" stroke-dasharray="3,5" opacity="0.4"/>`;
-    }).join('');
-
-    $('worldMapBody').innerHTML = `
-      <div class="map-wrap">
-        <svg viewBox="0 0 1000 500" class="world-svg" xmlns="http://www.w3.org/2000/svg">
-          <rect x="0" y="0" width="1000" height="500" fill="#0a1428"/>
-          ${WORLD_MAP_PATHS.map(p => `<path d="${p}" fill="#1c2e4a" stroke="#2d4a73" stroke-width="1.5"/>`).join('')}
-          ${allyLines}
-          ${warLines}
-          <circle cx="${playerCoord[0]}" cy="${playerCoord[1]}" r="12" fill="#FFD700" stroke="#fff" stroke-width="2">
-            <animate attributeName="r" values="10;14;10" dur="2s" repeatCount="indefinite"/>
-          </circle>
-          <text x="${playerCoord[0]}" y="${playerCoord[1] - 18}" text-anchor="middle" font-size="14" fill="#FFD700"
-            font-weight="bold" style="font-family:Orbitron">${s.country.flag} VOUS</text>
+    const wars=s.wars.map(w=>{const c=MAP_COORDS[w];return c?`<line x1="${me[0]}" y1="${me[1]}" x2="${c[0]}" y2="${c[1]}" stroke="#FF1744" stroke-width="2" stroke-dasharray="6,4"/>`:'';}).join('');
+    const allies=s.nations.filter(n=>n.relation==='ally'&&MAP_COORDS[n.id]).map(n=>{const c=MAP_COORDS[n.id];return `<line x1="${me[0]}" y1="${me[1]}" x2="${c[0]}" y2="${c[1]}" stroke="#43A047" stroke-width="1" stroke-dasharray="3,5" opacity="0.4"/>`;}).join('');
+    $('worldMapBody').innerHTML=`
+      <div class="map-controls">
+        <button class="map-btn" onclick="UI.mapZoom(1.3)">➕</button>
+        <button class="map-btn" onclick="UI.mapZoom(0.77)">➖</button>
+        <button class="map-btn" onclick="UI.mapReset()">⟳</button>
+        <span class="map-hint">Touchez un pays</span>
+      </div>
+      <div class="map-wrap" id="mapWrap">
+        <svg viewBox="0 0 1000 500" class="world-svg" id="worldSvg" style="transform:scale(${mapScale}) translate(${mapX}px,${mapY}px)">
+          <rect width="1000" height="500" fill="#0a1428"/>
+          ${WORLD_MAP_PATHS.map(p=>`<path d="${p}" fill="#1c2e4a" stroke="#2d4a73" stroke-width="1.5"/>`).join('')}
+          ${allies}${wars}
+          <circle cx="${me[0]}" cy="${me[1]}" r="11" fill="#FFD700" stroke="#fff" stroke-width="2"><animate attributeName="r" values="9;13;9" dur="2s" repeatCount="indefinite"/></circle>
+          <text x="${me[0]}" y="${me[1]-16}" text-anchor="middle" font-size="13" fill="#FFD700" font-weight="bold">${s.country.flag}</text>
           ${markers}
         </svg>
       </div>
-      <div class="map-legend">
-        <span>🟡 Vous</span><span>🟢 Allié</span><span>⚪ Neutre</span><span>🔴 Hostile / Guerre</span>
-      </div>
-      <div id="mapAction"><div class="empty-msg">Touchez un pays sur la carte pour interagir.</div></div>
-    `;
+      <div class="map-legend"><span>🟡 Vous</span><span>🟢 Allié</span><span>⚪ Neutre</span><span>🔴 Hostile</span></div>
+      <div id="mapAction"></div>`;
+    mapSel(s.countryId, true);
+  }
+  function mapZoom(f){ mapScale=Math.max(1,Math.min(4,mapScale*f)); const e=$("worldSvg"); if(e) e.style.transform=`scale(${mapScale}) translate(${mapX}px,${mapY}px)`; }
+  function mapReset(){ mapScale=1;mapX=0;mapY=0; const e=$('worldSvg'); if(e) e.style.transform='scale(1)'; }
+  function mapSel(id, isMe) {
+    const s=E.get();
+    if (id===s.countryId || isMe&&id===s.countryId) {
+      const res=Object.keys(s.resources).map(r=>RESOURCES[r].emoji).join(' ');
+      $('mapAction').innerHTML=`<div class="map-info-card you">
+        <div class="mic-head">${s.country.flag} ${s.country.name} <span class="badge-you">VOUS</span></div>
+        <div class="stat-row"><span>👥 Population</span><span>${s.population.toFixed(1)}M</span></div>
+        <div class="stat-row"><span>📈 PIB</span><span>${money(s.gdp)}</span></div>
+        <div class="stat-row"><span>⚔️ Puissance militaire</span><span>${E.totalArmyPower().toLocaleString('fr-FR')}</span></div>
+        <div class="stat-row"><span>⛏️ Ressources</span><span>${res}</span></div>
+        <div class="stat-row"><span>🤝 Alliés</span><span>${s.nations.filter(n=>n.relation==='ally').length}</span></div>
+      </div>`; return;
+    }
+    const n=s.nations.find(x=>x.id===id); if(!n) return;
+    const atWar=s.wars.includes(n.id);
+    $('mapAction').innerHTML=`<div class="map-info-card">
+      <div class="mic-head">${n.flag} ${n.name} ${atWar?'<span class="war-badge">⚔️ GUERRE</span>':n.relation==='ally'?'<span class="ally-badge">ALLIÉ</span>':''}</div>
+      <div class="stat-row"><span>📈 PIB</span><span>${money(n.gdp)}</span></div>
+      <div class="stat-row"><span>⚔️ Armée</span><span>${n.army}/100</span></div>
+      <div class="stat-row"><span>🤝 Relation</span><span class="nc-rel ${n.relation}">${n.relation==='ally'?'Allié':n.relation==='hostile'?'Hostile':'Neutre'}</span></div>
+      <div class="nc-actions" style="margin-top:8px">
+        ${n.relation!=='ally'&&!atWar?`<button class="btn-diplo" onclick="Engine.diplo('${n.id}','ally');UI.renderWorldMap()">🤝 Alliance ($50M)</button>`:''}
+        ${!atWar?`<button class="btn-diplo" onclick="Engine.diplo('${n.id}','trade');UI.renderWorldMap()">📦 Commerce</button>`:''}
+        ${atWar?`<button class="btn-diplo" onclick="Engine.diplo('${n.id}','peace');UI.renderWorldMap()">🕊️ Paix</button>`:(n.relation!=='ally'?`<button class="btn-diplo btn-war" onclick="if(confirm('Déclarer la guerre à ${n.name} ?')){Engine.diplo('${n.id}','war');UI.renderWorldMap();}">⚔️ Guerre</button>`:'')}
+      </div></div>`;
   }
 
-  function mapSelect(nationId) {
-    const s = Engine.get();
-    const n = s.nations.find(x => x.id === nationId);
-    if (!n) return;
-    const atWar = s.wars.includes(n.id);
-    $('mapAction').innerHTML = `
-      <div class="nation-card" style="margin:8px">
-        <div class="nc-flag">${n.flag}</div>
-        <div class="nc-info">
-          <div class="nc-name">${n.name}
-            ${atWar ? '<span class="war-badge">⚔️ GUERRE</span>' : n.relation === 'ally' ? '<span class="ally-badge">🤝 ALLIÉ</span>' : ''}
-          </div>
-          <div class="nc-rel ${n.relation}">PIB: ${fmt(n.gdp)} · Armée: ${n.army}/100</div>
+  /* ───────── CARTE NATIONALE ───────── */
+  function renderNational() {
+    const s=E.get();
+    if (!s.cities.length) { $('nationalBody').innerHTML='<div class="empty-msg">Carte nationale disponible uniquement pour la RDC.</div>'; return; }
+    const dots=s.cities.map(c=>{
+      const col=c.conflict?'#FF1744':c.capital?'#FFD700':c.mining?'#FF8F00':c.port?'#29B6F6':'#43A047';
+      const r=c.capital?9:Math.max(4,Math.min(8,c.pop*1.5));
+      return `<circle cx="${c.x}" cy="${c.y}" r="${r}" fill="${col}" stroke="#fff" stroke-width="1.5" style="cursor:pointer" onclick="UI.citySel('${c.id}')"/>
+        <text x="${c.x}" y="${c.y-r-3}" text-anchor="middle" font-size="11" fill="#E8E8F0" style="cursor:pointer" onclick="UI.citySel('${c.id}')">${c.name}</text>`;
+    }).join('');
+    $('nationalBody').innerHTML=`
+      <div class="map-wrap">
+        <svg viewBox="0 0 600 560" class="world-svg">
+          <rect width="600" height="560" fill="#0a1428"/>
+          <path d="${RDC_MAP_PATH}" fill="#1c4a2e" stroke="#FFD700" stroke-width="2"/>
+          ${dots}
+        </svg>
+      </div>
+      <div class="map-legend"><span>🟡 Capitale</span><span>🟠 Minière</span><span>🔵 Port</span><span>🔴 Conflit</span></div>
+      <div id="cityAction"><div class="empty-msg">Touchez une ville.</div></div>`;
+    citySel('kinshasa');
+  }
+  function citySel(id) {
+    const s=E.get(); const c=s.cities.find(x=>x.id===id); if(!c) return;
+    $('cityAction').innerHTML=`<div class="map-info-card">
+      <div class="mic-head">📍 ${c.name} ${c.capital?'⭐':''} ${c.conflict?'<span class="war-badge">⚠️ Conflit</span>':''}</div>
+      <div class="stat-row"><span>👥 Population</span><span>${c.pop.toFixed(1)}M hab.</span></div>
+      <div class="stat-row"><span>💼 Emploi</span><span>${c.employment.toFixed(0)}%</span></div>${bar(c.employment,'happy-fill')}
+      <div class="stat-row"><span>😊 Bonheur</span><span>${c.happiness.toFixed(0)}%</span></div>${bar(c.happiness,'happy-fill')}
+      <div class="stat-row"><span>🏗️ Infrastructures</span><span>${c.infra.toFixed(0)}%</span></div>${bar(c.infra,'sec-fill')}
+    </div>`;
+  }
+
+  /* ───────── AMBASSADES ───────── */
+  function renderEmbassies() {
+    const s=E.get();
+    $('embassyBody').innerHTML = `<div class="stat-row"><span>✈️ Solde migratoire</span><span style="color:${s.immigration>=0?'#43A047':'#C62828'}">${s.immigration>=0?'+':''}${s.immigration.toFixed(2)}/mois</span></div>` +
+      s.embassies.map(e=>{
+      const v=VISA_LEVELS[e.visaLevel];
+      return `<div class="embassy-card">
+        <div class="cmp-head"><span>${e.flag} Ambassade — ${e.name}</span><span>${v.emoji} ${v.label}</span></div>
+        <div class="stat-row"><span>🤝 Relation</span><span>${e.relation}/100</span></div>${bar(e.relation,'happy-fill')}
+        <div class="emb-tags">${e.tradeDeal?'<span class="tag green">📦 Accord commercial</span>':''}${e.militaryCoop?'<span class="tag blue">🛡️ Coop. militaire</span>':''}</div>
+        <div class="emb-visa">
+          <span class="emb-lbl">Politique de visa :</span>
+          ${Object.keys(VISA_LEVELS).map(lv=>`<button class="visa-btn ${e.visaLevel===lv?'active':''}" onclick="Engine.setVisa('${e.id}','${lv}');UI.renderEmbassies()">${VISA_LEVELS[lv].emoji} ${VISA_LEVELS[lv].label}</button>`).join('')}
         </div>
         <div class="nc-actions">
-          ${n.relation !== 'ally' && !atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','ally');UI.renderWorldMap()">🤝</button>` : ''}
-          ${!atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','trade');UI.renderWorldMap()">📦</button>` : ''}
-          ${atWar ? `<button class="btn-diplo" onclick="Engine.diplo('${n.id}','peace');UI.renderWorldMap()">🕊️</button>` :
-            n.relation !== 'ally' ? `<button class="btn-diplo btn-war" onclick="if(confirm('Déclarer la guerre à ${n.name} ?')){Engine.diplo('${n.id}','war');UI.renderWorldMap();}">⚔️</button>` : ''}
+          ${!e.tradeDeal?`<button class="btn-diplo" onclick="Engine.embassyAction('${e.id}','trade');UI.renderEmbassies()">📦 Accord ($30M)</button>`:''}
+          <button class="btn-diplo" onclick="Engine.embassyAction('${e.id}','aid');UI.renderEmbassies()">💰 Demander aide</button>
+          ${!e.militaryCoop?`<button class="btn-diplo" onclick="Engine.embassyAction('${e.id}','military');UI.renderEmbassies()">🛡️ Coop. mil. ($100M)</button>`:''}
         </div>
-      </div>
-    `;
+      </div>`;
+    }).join('');
   }
 
-  /* ── God Mode Editor ── */
-  function renderEditor() {
-    const s = Engine.get();
-    $('editorBody').innerHTML = `
-      <div class="editor-form">
-        <div>
-          <label>Nom de la ressource / industrie</label>
-          <input type="text" id="edName" placeholder="Ex: Usine Lithium, Tourisme Numérique...">
-        </div>
-        <div>
-          <label>Émoji</label>
-          <input type="text" id="edEmoji" placeholder="🔋" maxlength="2">
-        </div>
-        <div>
-          <label>Coût de création ($M)</label>
-          <input type="number" id="edCost" placeholder="500" min="1">
-        </div>
-        <div>
-          <label>Revenu annuel généré ($M)</label>
-          <input type="number" id="edIncome" placeholder="80" min="0">
-        </div>
-        <div>
-          <label>Type d'impact</label>
-          <select id="edType">
-            <option value="resource">Ressource minière</option>
-            <option value="industry">Industrie manufacturière</option>
-            <option value="tech">Technologie / Innovation</option>
-            <option value="tourism">Tourisme</option>
-          </select>
-        </div>
-        <div>
-          <label>Description / Effet</label>
-          <input type="text" id="edEffect" placeholder="Ex: Réduit la dépendance aux importations">
-        </div>
-        <button class="btn-create" onclick="UI.createResource()">⚡ AJOUTER À L'ÉCONOMIE NATIONALE</button>
-      </div>
-      <div style="padding:0 12px 12px">
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;letter-spacing:2px">RESSOURCES EXISTANTES</div>
-        ${Object.keys(s.resourcePrices).map(r => {
-          const res = RESOURCES[r];
-          return res ? `<div class="stat-row"><span>${res.emoji} ${res.name}</span><span class="text-gold">$${Math.floor(s.resourcePrices[r]).toLocaleString()}</span></div>` : '';
-        }).join('')}
-      </div>
-    `;
+  /* ───────── MINISTRES ───────── */
+  function renderMinisters() {
+    const s=E.get();
+    $('ministerBody').innerHTML = s.ministers.map(m=>`
+      <div class="minister-card">
+        <div class="min-head"><span>${m.emoji} ${m.role}</span></div>
+        <div class="min-name">${m.name}</div>
+        <div class="min-stat"><span>Compétence</span><span class="text-green">${m.competence}%</span></div>${bar(m.competence,'happy-fill')}
+        <div class="min-stat"><span>Corruption</span><span class="${m.corruption>40?'text-red':'text-gold'}">${m.corruption}%</span></div>${bar(m.corruption,'sec-fill')}
+        <div class="min-stat"><span>Loyauté</span><span class="text-gold">${m.loyalty}%</span></div>${bar(m.loyalty,'happy-fill')}
+        <button class="btn-sm btn-sell" style="margin-top:6px" onclick="UI.sackMinister('${m.role.replace(/'/g,'\\\'')}')">Limoger</button>
+      </div>`).join('');
+  }
+  function sackMinister(role) {
+    const s=E.get(); const m=s.ministers.find(x=>x.role===role); if(!m) return;
+    const names=['Albert Mbuyi','Florence Kasa','Patrick Lumumba','Grace Tshala','Olivier Mabaya','Carine Nzuzi'];
+    m.name=names[Math.floor(Math.random()*names.length)];
+    m.competence=50+Math.floor(Math.random()*45); m.corruption=10+Math.floor(Math.random()*40); m.loyalty=60+Math.floor(Math.random()*35);
+    toast(`👔 Nouveau ${m.role} nommé`,'info'); renderMinisters();
   }
 
-  function createResource() {
-    const name = document.getElementById('edName').value.trim();
-    const emoji = document.getElementById('edEmoji').value.trim() || '🏭';
-    const cost = parseFloat(document.getElementById('edCost').value) || 500;
-    const income = parseFloat(document.getElementById('edIncome').value) || 50;
-    const effect = document.getElementById('edEffect').value.trim() || 'Nouvelle industrie nationale';
-    if (!name) { notify('Entrez un nom de ressource !', 'error'); return; }
-    Engine.addCustomResource(name, emoji, cost, income, effect);
-    renderEditor();
+  /* ───────── ARMÉE ───────── */
+  function renderArmy() {
+    const s=E.get();
+    $('ar-forces').innerHTML = `<div class="stat-row"><span>⚔️ Puissance totale</span><span class="text-gold">${E.totalArmyPower().toLocaleString('fr-FR')}</span></div>` +
+      ARMY_UNITS.map(u=>`
+      <div class="army-card">
+        <div class="cmp-head"><span>${u.emoji} ${u.name}</span><span class="text-gold">${(s.army[u.id]||0).toLocaleString('fr-FR')}</span></div>
+        <div class="cmp-line">Coût: $${u.cost}M/unité · Puissance ${u.power} · Entretien $${u.upkeep}M/an</div>
+        <div class="nc-actions">
+          <button class="btn-sm btn-invest" onclick="Engine.buyArmy('${u.id}',${u.id==='soldiers'?1000:u.id==='tanks'?10:1});UI.renderArmy();UI.refresh()">+ Acheter</button>
+          <button class="btn-sm btn-invest" onclick="Engine.buyArmy('${u.id}',${u.id==='soldiers'?10000:u.id==='tanks'?50:5});UI.renderArmy();UI.refresh()">+ En masse</button>
+        </div>
+      </div>`).join('');
+    $('ar-budget').innerHTML = `
+      ${slider('Budget de défense ($M/an)','defBudget',Math.round(s.defBudget),100,Math.max(2000,Math.floor(s.gdp*0.1)),'M')}
+      <div class="stat-row"><span>% du PIB</span><span>${(s.defBudget/s.gdp*100).toFixed(2)}%</span></div>
+      <div class="stat-row"><span>🔒 Effet sécurité</span><span class="text-green">+${(s.defBudget/1000).toFixed(1)} pts</span></div>
+      <div class="stat-row"><span>⚔️ Conflits actifs</span><span class="${s.wars.length?'text-red':'text-green'}">${s.wars.length}</span></div>`;
+    const r=document.querySelector('#ar-budget input[type=range]');
+    if(r) r.addEventListener('input',()=>{ $('sv-defBudget').textContent='$'+(+r.value).toLocaleString('fr-FR')+'M'; Engine.setDefBudget(+r.value); });
   }
 
-  /* ── Events / Notifications ── */
+  /* ───────── INFRASTRUCTURES ───────── */
+  function renderInfra() {
+    const s=E.get();
+    $('infraBody').innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-card-label">⚡ Énergie</div><div class="stat-card-val">${s.energyCap.toLocaleString('fr-FR')} MW</div></div>
+        <div class="stat-card"><div class="stat-card-label">🔌 Électrification</div><div class="stat-card-val">${s.electrRate.toFixed(0)}%</div></div>
+        <div class="stat-card"><div class="stat-card-label">🛣️ Routes</div><div class="stat-card-val">${s.roadKm.toLocaleString('fr-FR')} km</div></div>
+        <div class="stat-card"><div class="stat-card-label">✈️ Aéroports</div><div class="stat-card-val">${s.airports}</div></div>
+      </div>
+      <div class="build-grid">${INFRA_PROJECTS.map(p=>{
+        const st=s.infra.find(x=>x.id===p.id);
+        return `<div class="build-card ${st.built?'built':st.building?'building':''}">
+          <div class="bc-emoji">${p.emoji}</div><div class="bc-name">${p.name}</div>
+          <div class="bc-cost">💰 $${p.cost}M</div><div class="bc-effect">${p.desc}</div>
+          <div class="bc-status">${st.built?'✅ Terminé':st.building?`🏗️ ${st.progress}/${p.days} j`:`⏳ ${p.days} jours`}</div>
+          ${!st.built&&!st.building?`<button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildInfra('${p.id}');UI.renderInfra();UI.refresh()">Construire</button>`:''}
+        </div>`;
+      }).join('')}</div>`;
+  }
+
+  /* ───────── SPORTS ───────── */
+  function renderSports() {
+    const s=E.get();
+    $('sp-stadiums').innerHTML = s.stadiums.map(st=>`
+      <div class="build-card-wide ${st.built?'built':st.building?'building':''}">
+        <div class="cmp-head"><span>${st.emoji} ${st.name}</span><span>${st.built?'✅':st.building?`🏗️ ${st.progress||0}/180j`:''}</span></div>
+        <div class="cmp-line">📍 ${st.city} · 🪑 ${st.capacity.toLocaleString('fr-FR')} places · 💰 $${st.cost}M</div>
+        ${!st.built&&!st.building?`<button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.buildStadium('${st.id}');UI.renderSports();UI.refresh()">Construire</button>`:''}
+      </div>`).join('');
+    $('sp-disc').innerHTML = s.sports.map(sp=>`
+      <div class="sport-card">
+        <div class="cmp-head"><span>${sp.emoji} ${sp.name}</span><span class="stars">${stars(sp.level/20)}</span></div>
+        <div class="cmp-line">Niveau ${Math.round(sp.level)}/100 · Budget $${Math.round(sp.budget)}M</div>
+        <div class="nc-actions"><button class="btn-sm btn-invest" onclick="Engine.fundSport('${sp.id}',50);UI.renderSports();UI.refresh()">+$50M</button><button class="btn-sm btn-invest" onclick="Engine.fundSport('${sp.id}',150);UI.renderSports();UI.refresh()">+$150M</button></div>
+      </div>`).join('');
+    $('sp-events').innerHTML = (s.activeSportEvents.length?`<div class="rdc-badge">🔴 EN COURS : ${s.activeSportEvents.map(e=>e.emoji+' '+e.name+' ('+e.daysLeft+'j)').join(', ')}</div>`:'') +
+      SPORT_EVENTS.map(e=>`
+      <div class="build-card-wide">
+        <div class="cmp-head"><span>${e.emoji} ${e.name}</span><span class="text-gold">$${e.cost}M</span></div>
+        <div class="cmp-line">😊 Bonheur +${e.happiness} · 🏖️ Tourisme +${e.tourism} · ⭐ Prestige +${e.prestige}</div>
+        <button class="btn-sm btn-invest" style="margin-top:6px" onclick="Engine.hostSportEvent('${e.id}');UI.renderSports();UI.refresh()">Organiser</button>
+      </div>`).join('');
+  }
+
+  /* ───────── ÉLECTIONS ───────── */
+  function renderElections() {
+    const s=E.get();
+    if (!s.electionDate) { $('electionBody').innerHTML='<div class="empty-msg">Régime sans élection présidentielle.</div>'; return; }
+    const days=Math.max(0,Math.ceil((s.electionDate-s.date)/86400000));
+    const poll=Math.floor(40+s.happiness*0.4+s.prestige*0.1);
+    $('electionBody').innerHTML=`
+      <div class="election-hero">
+        <div class="eh-icon">🗳️</div>
+        <div class="eh-title">Élection présidentielle</div>
+        <div class="eh-date">${E.fmtDate(s.electionDate)}</div>
+        <div class="eh-sub">dans ${days.toLocaleString('fr-FR')} jours · Mandat ${s.mandat}</div>
+      </div>
+      <div class="stat-row"><span>📊 Intentions de vote (estimé)</span><span class="${poll>50?'text-green':'text-red'}">${poll}%</span></div>${bar(poll,'happy-fill')}
+      <div class="stat-row"><span>⭐ Prestige</span><span>${s.prestige.toFixed(0)}/100</span></div>
+      <h4 class="sec-h">Campagne électorale</h4>
+      <button class="btn-sm btn-invest" style="width:100%;margin-bottom:6px" onclick="UI.campaign('meeting')">🎤 Organiser un meeting (-$80M, +popularité)</button>
+      <button class="btn-sm btn-invest" style="width:100%;margin-bottom:6px" onclick="UI.campaign('media')">📺 Campagne médiatique (-$150M, +prestige)</button>
+      <button class="btn-sm btn-invest" style="width:100%" onclick="UI.campaign('party')">🏛️ Financer le parti (-$200M, +intentions)</button>`;
+  }
+  function campaign(type) {
+    const s=E.get();
+    const cost={meeting:80,media:150,party:200}[type];
+    if(s.treasury<cost){ toast('Fonds insuffisants','error'); return; }
+    s.treasury-=cost;
+    if(type==='meeting') s.happiness=Math.min(100,s.happiness+4);
+    if(type==='media') s.prestige=Math.min(100,s.prestige+6);
+    if(type==='party'){ s.happiness=Math.min(100,s.happiness+3); s.prestige=Math.min(100,s.prestige+3); }
+    toast('🎉 Action de campagne effectuée','success'); renderElections(); refresh();
+  }
+
+  /* ───────── RÉSEAU SOCIAL ───────── */
+  function renderSocial() {
+    const s=E.get();
+    $('socialBody').innerHTML = `<div class="social-head">📱 CongoX — Réseau social national</div>` +
+      (s.socialFeed.length?s.socialFeed.map(p=>`
+      <div class="tweet ${p.sentiment>0?'pos':p.sentiment<0?'neg':''}">
+        <div class="tw-top"><span class="tw-user">${p.user}</span><span class="tw-date">${p.date}</span></div>
+        <div class="tw-text">${p.text}</div>
+        <div class="tw-meta">💬 ${Math.floor(p.likes/8)} &nbsp; 🔁 ${p.reposts} &nbsp; ❤️ ${p.likes}</div>
+      </div>`).join(''):'<div class="empty-msg">Pas encore de publications.</div>');
+  }
+
+  /* ───────── ACTUALITÉS ───────── */
+  function renderNews() {
+    const s=E.get();
+    $('newsLocal').innerHTML = s.newsLocal.slice(0,8).map(n=>`<div class="news-item">${n.text}<div class="news-date">📅 ${n.date}</div></div>`).join('')||'<div class="empty-msg">—</div>';
+    $('newsWorld').innerHTML = s.newsWorld.slice(0,8).map(n=>`<div class="news-item">${n.text}<div class="news-date">📅 ${n.date}</div></div>`).join('')||'<div class="empty-msg">—</div>';
+  }
+
+  /* ───────── ONU ───────── */
+  function renderUN() {
+    const s=E.get();
+    $('unBody').innerHTML = `<div class="rdc-badge">🇺🇳 Conseil de Sécurité — Votes internationaux</div>` +
+      UN_RESOLUTIONS.map(r=>{
+        const voted=s.unResolutionsVoted.includes(r.id);
+        return `<div class="un-card">
+          <div class="un-title">${r.title}</div>
+          <div class="un-desc">${r.desc}</div>
+          ${voted?'<div class="un-voted">✅ Vote enregistré</div>':`<div class="nc-actions">
+            <button class="btn-sm btn-buy" onclick="Engine.unVote('${r.id}','yes');UI.renderUN();UI.refresh()">✅ POUR</button>
+            <button class="btn-sm btn-sell" onclick="Engine.unVote('${r.id}','no');UI.renderUN();UI.refresh()">❌ CONTRE</button>
+          </div>`}
+        </div>`;
+      }).join('');
+  }
+
+  /* ───────── ÉVÉNEMENTS / TOASTS ───────── */
   function showEvent(ev) {
-    const overlay = $('eventOverlay');
-    $('evIcon').textContent = ev.icon;
-    $('evTitle').textContent = ev.title;
-    $('evDesc').textContent = ev.desc;
-    $('evChoices').innerHTML = ev.choices.map((c, i) => `
-      <button class="event-choice" onclick="UI.resolveEvent(${i})">${c.label}</button>
-    `).join('');
-    overlay.classList.remove('hidden');
-    overlay._ev = ev;
+    $('evIcon').textContent=ev.icon; $('evTitle').textContent=ev.title; $('evDesc').textContent=ev.desc;
+    $('evChoices').innerHTML=ev.choices.map((c,i)=>`<button class="event-choice" onclick="UI.ev(${i})">${c.label}</button>`).join('');
+    $('eventOverlay').classList.remove('hidden'); $('eventOverlay')._ev=ev;
   }
+  function hideEvent(){ $('eventOverlay').classList.add('hidden'); }
+  function ev(i){ const e=$('eventOverlay')._ev; const s=E.get(); if(s&&s.gameOver){ location.reload(); return; } E.resolveEvent(e,i); }
 
-  function hideEvent() {
-    $('eventOverlay').classList.add('hidden');
+  function toast(msg,type) {
+    const el=$('alertBanner'); el.classList.remove('hidden'); $('alertText').textContent=msg;
+    el.style.background = type==='error'?'linear-gradient(135deg,#C62828,#B71C1C)':type==='success'?'linear-gradient(135deg,#2E7D32,#1B5E20)':'linear-gradient(135deg,#E65100,#BF360C)';
+    clearTimeout(el._t); el._t=setTimeout(()=>el.classList.add('hidden'),3000);
   }
+  function badge(app,count){ const el=$('badge-'+app); if(!el)return; if(count>0){el.textContent=count>9?'9+':count;el.classList.remove('hidden');}else el.classList.add('hidden'); }
 
-  function resolveEvent(idx) {
-    const ev = $('eventOverlay')._ev;
-    Engine.resolveEvent(ev, idx);
-  }
-
-  function notify(msg, type) {
-    const el = $('alertBanner');
-    el.classList.remove('hidden');
-    $('alertText').textContent = msg;
-    el.style.background = type === 'error' ? 'linear-gradient(135deg,#C62828,#B71C1C)'
-      : type === 'success' ? 'linear-gradient(135deg,#2E7D32,#1B5E20)'
-      : 'linear-gradient(135deg,#E65100,#BF360C)';
-    clearTimeout(el._timeout);
-    el._timeout = setTimeout(() => el.classList.add('hidden'), 3500);
-  }
-
-  function setBadge(app, count) {
-    const el = $(`badge-${app}`);
-    if (!el) return;
-    if (count > 0) {
-      el.textContent = count > 9 ? '9+' : count;
-      el.classList.remove('hidden');
-    } else {
-      el.classList.add('hidden');
-    }
-  }
-
-  function showGameOver() {
-    const s = Engine.get();
-    $('alertBanner').classList.remove('hidden');
-    $('alertText').textContent = `🏁 FIN DE PARTIE — Score: ${s.score} pts | Jour ${s.day} | Mandat ${s.mandat}`;
-  }
-
-  /* ── Render All ── */
   function renderAll() {
-    const s = Engine.get();
-    update();
-    renderCabinet();
-    renderEconomy();
-    renderEnergy();
-    renderDevelopment();
-    renderDiplomacy();
-    renderDefense();
-    renderIntelligence();
-    renderNews();
-    renderSports();
-    renderResourceMarket();
-    renderEditor();
-    renderPolice();
-    renderSocial();
-    renderPopulation();
-    renderWorldMap();
+    refresh(); renderCabinet(); renderEconomy(); renderResources(); renderCompanies();
+    renderTrade(); renderEmbassies(); renderMinisters(); renderArmy(); renderInfra();
+    renderSports(); renderElections(); renderSocial(); renderNews(); renderUN();
   }
 
-  /* ── Init ── */
-  document.addEventListener('DOMContentLoaded', () => {
-    runSplash();
-  });
+  document.addEventListener('DOMContentLoaded', runSplash);
 
   return {
-    update, notify, setBadge, showEvent, hideEvent,
-    renderCabinet, renderEconomy, renderEnergy, renderDevelopment,
-    renderDiplomacy, renderDefense, renderIntelligence, renderNews,
-    renderSports, renderResources, renderResourceMarket, renderEditor,
-    renderPolice, renderSocial, renderPopulation, renderWorldMap, renderNetworks,
-    mapSelect, cabinetChoice, resolveEvent, createResource
+    refresh, toast, badge, showEvent, hideEvent, ev,
+    renderCabinet, renderEconomy, renderResources, renderCompanies, renderTrade,
+    renderWorldMap, renderNational, renderEmbassies, renderMinisters, renderArmy,
+    renderInfra, renderSports, renderElections, renderSocial, renderNews, renderUN,
+    cab, coTypeChange, coPreview, createCompany, trPreview, signContract,
+    mapZoom, mapReset, mapSel, citySel, sackMinister, campaign
   };
 })();
